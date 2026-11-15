@@ -17,7 +17,9 @@ File condivisi: `data.js` (dati di esempio), `common.js` (funzioni comuni), `sty
 
 ### Come aprirla
 
-Le pagine vanno servite da un piccolo server locale (aperte con doppio clic alcune parti non funzionano):
+Online: <https://andreollidesign-dot.github.io/report-michelin/> (porta dritto all'accesso della v7).
+
+In locale, le pagine vanno servite da un piccolo server locale (aperte con doppio clic alcune parti non funzionano):
 
 ```bash
 cd v7
