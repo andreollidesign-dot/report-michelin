@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Report DEM Michelin</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Barlow+Condensed:wght@600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F4F2}
+a{color:#A35200}a:hover{color:#6E3700}
+button{font-family:inherit}
+.rowbtn{background:none;border:0;padding:0;text-align:left;font:inherit;color:#2B2B2B;cursor:pointer;text-decoration:underline;text-decoration-color:#D9D9D4;text-underline-offset:3px}
+.rowbtn:hover{color:#A35200;text-decoration-color:#A35200}
+.seg:hover{background:#ECECE8}
+.sortbtn{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-transform:inherit;letter-spacing:inherit}
+.sortbtn:hover{color:#2B2B2B}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F4F4F2; color: #2B2B2B; font-family: 'Barlow', system-ui, sans-serif; font-size: 15px; line-height: 1.45">
+
+  <header style="background: #FFFFFF; color: #2B2B2B; border-bottom: 4px solid #3D3D3D">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 10px clamp(16px, 4vw, 40px); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 14px">
+        <img src="/_blob/87263749e4b3f8474750dfae3afbe6ab" alt="Lulop.com" style="height: 48px; width: auto; display: block">
+        <span style="width: 1px; height: 28px; background: #CFCFC8" aria-hidden="true"></span>
+        <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 22px; letter-spacing: 0.5px">Report</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px; font-size: 14px">
+        <span>Michelin</span>
+        <a href="#">Esci</a>
+      </div>
+    </div>
+  </header>
+
+  <div style="background: #FCE9CF; color: #5C3300; font-size: 13px; text-align: center; padding: 6px 16px">Mockup · tutti i numeri sono dati di esempio</div>
+
+  <main style="max-width: 1200px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 56px; display: flex; flex-direction: column; gap: 28px">
+
+    <section style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px">
+      <div>
+        <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; line-height: 1.05">Statistiche DEM</h1>
+        <p style="margin: 6px 0 0; color: #5E5E5E">Michelin · {{periodLabel}} · dati aggiornati il 23 ottobre 2026 alle 06:00</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: #5E5E5E">Periodo</span>
+          <div style="display: flex; background: #FFFFFF; border: 1px solid #DCDCD6; border-radius: 8px; padding: 3px; gap: 2px">
+            <sc-for list="{{periods}}" as="p" hint-placeholder-count="3">
+              <button class="seg" aria-pressed="{{p.pressed}}" onClick="{{p.pick}}" style="{{p.style}}">{{p.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <sc-if value="{{isCustom}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 14px 16px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <label for="dal" style="font-size: 13px; color: #5E5E5E">Dal</label>
+          <input id="dal" type="date" value="2026-09-01" style="font: inherit; padding: 8px 10px; border: 1px solid #CFCFC8; border-radius: 6px; min-height: 44px; box-sizing: border-box">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <label for="al" style="font-size: 13px; color: #5E5E5E">Al</label>
+          <input id="al" type="date" value="2026-10-23" style="font: inherit; padding: 8px 10px; border: 1px solid #CFCFC8; border-radius: 6px; min-height: 44px; box-sizing: border-box">
+        </div>
+        <span style="font-size: 13px; color: #5E5E5E; padding-bottom: 12px">Con le date a scelta non c'è il confronto con il periodo precedente.</span>
+      </div>
+    </sc-if>
+
+    <section aria-labelledby="kpi-h" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="kpi-h" style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 24px">In sintesi</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+        <sc-for list="{{kpis}}" as="k" hint-placeholder-count="6">
+          <div style="background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 13px; color: #5E5E5E">{{k.label}}</span>
+            <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 36px; line-height: 1.1">{{k.value}}</span>
+            <span style="font-size: 13px; font-weight: 600; color: {{k.deltaColor}}">{{k.delta}}</span>
+            <span style="font-size: 12px; color: #6B6B6B">{{k.note}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px">
+      <div style="background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
+          <h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 24px">Andamento {{trendUnit}}</h2>
+          <div style="display: flex; background: #F4F4F2; border-radius: 8px; padding: 3px; gap: 2px">
+            <sc-for list="{{metrics}}" as="m" hint-placeholder-count="3">
+              <button class="seg" aria-pressed="{{m.pressed}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 8px; height: 230px; border-bottom: 1px solid #CFCFC8; padding-top: 8px">
+          <sc-for list="{{trend}}" as="b" hint-placeholder-count="8">
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%">
+              <span style="font-size: 12px; font-weight: 600; color: #2B2B2B; white-space: nowrap">{{b.label}}</span>
+              <div style="{{b.barStyle}}"></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: flex; gap: 8px">
+          <sc-for list="{{trend}}" as="b" hint-placeholder-count="8">
+            <span style="flex: 1; min-width: 0; text-align: center; font-size: 12px; color: #5E5E5E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{b.name}}</span>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div>
+          <h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 24px">Su cosa hanno cliccato</h2>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #5E5E5E">Click per tipo di link. Una persona può cliccare più link.</p>
+        </div>
+        <sc-for list="{{breakdown}}" as="c" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column; gap: 5px">
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px">
+              <span>{{c.label}}</span>
+              <span style="font-weight: 600">{{c.value}} <span style="font-weight: 400; color: #5E5E5E">· {{c.pct}}</span></span>
+            </div>
+            <div style="height: 10px; background: #F0F0EC; border-radius: 5px; overflow: hidden">
+              <div style="{{c.barStyle}}"></div>
+            </div>
+          </div>
+        </sc-for>
+        <p style="margin: 4px 0 0; font-size: 12px; color: #6B6B6B">Le disiscrizioni non sono conteggiate nei click unici né nel CTR.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="tab-h" style="background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px">
+        <h2 id="tab-h" style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 24px">Le DEM del periodo</h2>
+        <span style="font-size: 13px; color: #5E5E5E">Clicca su un titolo per vedere il dettaglio</span>
+      </div>
+      <sc-if value="{{noRows}}" hint-placeholder-val="{{ false }}">
+        <p style="margin: 0; padding: 24px 0; color: #5E5E5E">Nessuna DEM inviata in questo periodo.</p>
+      </sc-if>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14px">
+          <thead>
+            <tr style="text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #5E5E5E">
+              <sc-for list="{{cols}}" as="col" hint-placeholder-count="8">
+                <th scope="col" style="{{col.style}}"><button class="sortbtn" onClick="{{col.sort}}">{{col.label}} {{col.arrow}}</button></th>
+              </sc-for>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+              <tr style="{{r.trStyle}}">
+                <td style="padding: 12px 10px; white-space: nowrap; color: #5E5E5E">{{r.dateLabel}}</td>
+                <td style="padding: 12px 10px">
+                  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                    <button class="rowbtn" onClick="{{r.open}}">{{r.title}}</button>
+                    <sc-if value="{{r.best}}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: #F39200; color: #2B2B2B; padding: 2px 8px; border-radius: 10px">Migliore</span>
+                    </sc-if>
+                  </div>
+                  <span style="font-size: 12px; color: #6B6B6B">#{{r.id}}</span>
+                </td>
+                <td style="padding: 12px 10px"><span style="font-size: 12px; font-weight: 600; border: 1px solid #CFCFC8; border-radius: 4px; padding: 1px 6px">{{r.lang}}</span></td>
+                <td style="padding: 12px 10px; text-align: right">{{r.inviiF}}</td>
+                <td style="padding: 12px 10px; text-align: right">{{r.apF}}</td>
+                <td style="padding: 12px 10px; text-align: right">{{r.orF}}</td>
+                <td style="padding: 12px 10px; text-align: right">{{r.cuF}}</td>
+                <td style="padding: 12px 10px; text-align: right; font-weight: 600">{{r.ctrF}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <sc-if value="{{hasSel}}" hint-placeholder-val="{{ false }}">
+      <section id="dettaglio" aria-labelledby="det-h" style="background: #FFFFFF; border: 2px solid #3D3D3D; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 20px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 400px">
+            <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: #A35200">Dettaglio DEM #{{sel.id}} · {{sel.lang}} · inviata il {{sel.dateLong}}</span>
+            <h2 id="det-h" style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; line-height: 1.1">{{sel.title}}</h2>
+          </div>
+          <button onClick="{{closeSel}}" style="min-height: 44px; padding: 0 16px; border: 1px solid #CFCFC8; background: #FFFFFF; border-radius: 8px; font-size: 14px; cursor: pointer">Chiudi dettaglio</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px">
+          <sc-for list="{{selKpis}}" as="k" hint-placeholder-count="6">
+            <div style="background: #F7F7F4; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 13px; color: #5E5E5E">{{k.label}}</span>
+              <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.1">{{k.value}}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 24px">
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600">Quando l'hanno aperta</h3>
+            <div style="display: flex; align-items: flex-end; gap: 6px; height: 160px; border-bottom: 1px solid #CFCFC8">
+              <sc-for list="{{selTimeline}}" as="b" hint-placeholder-count="7">
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%">
+                  <span style="font-size: 12px; font-weight: 600">{{b.label}}</span>
+                  <div style="{{b.barStyle}}"></div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display: flex; gap: 6px">
+              <sc-for list="{{selTimeline}}" as="b" hint-placeholder-count="7">
+                <span style="flex: 1; min-width: 0; text-align: center; font-size: 11px; color: #5E5E5E">{{b.name}}</span>
+              </sc-for>
+            </div>
+            <span style="font-size: 12px; color: #6B6B6B">Aperture uniche nelle ore e nei giorni dopo l'invio</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600">Su cosa hanno cliccato</h3>
+            <sc-for list="{{selBreakdown}}" as="c" hint-placeholder-count="5">
+              <div style="display: flex; flex-direction: column; gap: 5px">
+                <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px">
+                  <span>{{c.label}}</span>
+                  <span style="font-weight: 600">{{c.value}} <span style="font-weight: 400; color: #5E5E5E">· {{c.pct}}</span></span>
+                </div>
+                <div style="height: 10px; background: #F0F0EC; border-radius: 5px; overflow: hidden">
+                  <div style="{{c.barStyle}}"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600">Testate che l'hanno aperta</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+              <thead>
+                <tr style="text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #5E5E5E">
+                  <th scope="col" style="padding: 6px 0; font-weight: 600">Testata</th>
+                  <th scope="col" style="padding: 6px 0; font-weight: 600; text-align: right">Aperture</th>
+                  <th scope="col" style="padding: 6px 0; font-weight: 600; text-align: right">Click</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{selTestate}}" as="t" hint-placeholder-count="6">
+                  <tr style="border-top: 1px solid #ECECE8">
+                    <td style="padding: 8px 0">{{t.name}} <span style="font-size: 12px; color: #6B6B6B">· {{t.cat}}</span></td>
+                    <td style="padding: 8px 0; text-align: right">{{t.ap}}</td>
+                    <td style="padding: 8px 0; text-align: right">{{t.cl}}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+
+    <section aria-labelledby="pub-h" style="display: flex; flex-direction: column; gap: 12px">
+      <div>
+        <h2 id="pub-h" style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 24px">Il pubblico raggiunto</h2>
+        <p style="margin: 4px 0 0; font-size: 14px; color: #5E5E5E">Solo dati aggregati: mostriamo le testate, mai i nomi o le email dei giornalisti.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px">
+
+        <div style="background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 600">Iscritti alle liste di interesse</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+            <thead>
+              <tr style="text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #5E5E5E">
+                <th scope="col" style="padding: 6px 0; font-weight: 600">Lista</th>
+                <th scope="col" style="padding: 6px 0; font-weight: 600; text-align: right">IT</th>
+                <th scope="col" style="padding: 6px 0; font-weight: 600; text-align: right">EN</th>
+                <th scope="col" style="padding: 6px 0; font-weight: 600; text-align: right">Totale</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{lists}}" as="li" hint-placeholder-count="7">
+                <tr style="border-top: 1px solid #ECECE8">
+                  <td style="padding: 8px 0">{{li.name}}</td>
+                  <td style="padding: 8px 0; text-align: right">{{li.itF}}</td>
+                  <td style="padding: 8px 0; text-align: right">{{li.enF}}</td>
+                  <td style="padding: 8px 0; text-align: right; font-weight: 600">{{li.totF}}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <span style="font-size: 12px; color: #6B6B6B">Un giornalista può essere iscritto a più liste.</span>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+          <div>
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600">Risultati per lista di interesse</h3>
+            <p style="margin: 2px 0 0; font-size: 13px; color: #5E5E5E">Aperture uniche nel periodo, per interesse dichiarato dal giornalista</p>
+          </div>
+          <sc-for list="{{listPerf}}" as="lp" hint-placeholder-count="7">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px">
+                <span>{{lp.name}}</span>
+                <span><span style="font-weight: 600">{{lp.apF}}</span> <span style="color: #5E5E5E">aperture · {{lp.clF}} click</span></span>
+              </div>
+              <div style="height: 10px; background: #F0F0EC; border-radius: 5px; overflow: hidden">
+                <div style="{{lp.barStyle}}"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #E2E2DE; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 600">Testate più attive</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+            <thead>
+              <tr style="text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #5E5E5E">
+                <th scope="col" style="padding: 6px 0; font-weight: 600">Testata</th>
+                <th scope="col" style="padding: 6px 0; font-weight: 600; text-align: right">Aperture</th>
+                <th scope="col" style="padding: 6px 0; font-weight: 600; text-align: right">Click</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{topTestate}}" as="t" hint-placeholder-count="8">
+                <tr style="border-top: 1px solid #ECECE8">
+                  <td style="padding: 8px 0">{{t.name}} <span style="font-size: 12px; color: #6B6B6B">· {{t.cat}}</span></td>
+                  <td style="padding: 8px 0; text-align: right">{{t.ap}}</td>
+                  <td style="padding: 8px 0; text-align: right">{{t.cl}}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer style="border-top: 1px solid #DCDCD6; padding-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px 24px; font-size: 13px; color: #5E5E5E">
+      <p style="margin: 0"><strong style="color: #2B2B2B">Aperture uniche</strong>: destinatari che hanno aperto la DEM almeno una volta.</p>
+      <p style="margin: 0"><strong style="color: #2B2B2B">Click unici</strong>: destinatari che hanno cliccato almeno un link, disiscrizioni escluse.</p>
+      <p style="margin: 0"><strong style="color: #2B2B2B">CTR</strong>: click unici diviso invii. Stesso calcolo del report mensile.</p>
+      <p style="margin: 0"><strong style="color: #2B2B2B">Aggiornamento</strong>: i dati si aggiornano ogni notte.</p>
+    </footer>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3200}}'>
+var DEMS = [
+  [37388,'2026-09-02','IT','Michelin CrossClimate 3: la gamma si amplia a 40 misure',4120,1350,160,70,22,8,6],
+  [37402,'2026-09-04','EN','MICHELIN Guide Texas 2026: the new selection',5210,1610,150,55,30,10,9],
+  [37431,'2026-09-10','IT','Michelin al Salone Auto Torino: le novità in mostra',3980,1180,120,48,18,6,5],
+  [37456,'2026-09-16','EN','Michelin X Multi Energy: lower fuel consumption for long-haul trucks',4870,1420,130,62,21,9,7],
+  [37470,'2026-09-18','IT','Guida MICHELIN Italia 2027: annunciata la data della presentazione',4210,1530,210,60,28,11,4],
+  [37495,'2026-09-24','IT','Michelin Power Cup: il nuovo pneumatico per la pista',3890,1210,140,72,19,7,6],
+  [37508,'2026-09-29','EN','Michelin and sustainable mobility: tyres with 45% renewable materials',5020,1490,120,58,24,8,10],
+  [37522,'2026-10-01','IT','Michelin e la mobilità sostenibile: pneumatici con il 45% di materiali rinnovabili',4180,1390,170,80,25,9,5],
+  [37541,'2026-10-06','EN','MICHELIN Guide Nordic Countries 2026',5150,1720,190,60,33,11,8],
+  [37563,'2026-10-09','IT','Michelin Pilot Sport 5 Energy: la versione per le auto elettriche',4230,1460,195,92,27,10,6],
+  [37588,'2026-10-14','IT','Guida MICHELIN Italia 2027: le nuove Stelle Verdi',4260,1690,260,75,35,12,4],
+  [37602,'2026-10-15','EN','Michelin at EICMA 2026: what to expect',5090,1550,160,70,26,9,9],
+  [37627,'2026-10-20','IT','Michelin Anakee Road: il nuovo pneumatico per le maxi enduro',3940,1300,185,95,21,8,7],
+  [37649,'2026-10-21','EN','MICHELIN Guide Texas: three new stars',5180,1680,175,58,31,10,8],
+  [37661,'2026-10-22','IT','Michelin X Line Energy: meno consumi per il trasporto pesante',4050,1240,150,88,20,7,5]
+].map(function (d) {
+  return { id: d[0], date: d[1], lang: d[2], title: d[3], invii: d[4], ap: d[5], news: d[6], dl: d[7], web: d[8], altro: d[9], unsub: d[10], cu: Math.round((d[6] + d[7] + d[8] + d[9]) * 0.8) };
+});
+
+var MONTH_BASE = [
+  { name: 'Mag', it: [12300, 3900, 470], en: [15100, 4500, 430] },
+  { name: 'Giu', it: [16400, 5300, 610], en: [15300, 4700, 450] },
+  { name: 'Lug', it: [12100, 3800, 440], en: [15000, 4400, 400] },
+  { name: 'Ago', it: [4000, 1100, 110], en: [5000, 1400, 120] }
+];
+
+var WEEKS = [
+  ['2026-08-31', '2026-09-06', '31 ago'], ['2026-09-07', '2026-09-13', '7 set'], ['2026-09-14', '2026-09-20', '14 set'], ['2026-09-21', '2026-09-27', '21 set'],
+  ['2026-09-28', '2026-10-04', '28 set'], ['2026-10-05', '2026-10-11', '5 ott'], ['2026-10-12', '2026-10-18', '12 ott'], ['2026-10-19', '2026-10-25', '19 ott']
+];
+
+var PERIODS = {
+  week: { label: 'Settimana', range: ['2026-10-19', '2026-10-25'], prev: ['2026-10-12', '2026-10-18'], text: 'settimana 19–25 ottobre 2026' },
+  month: { label: 'Mese', range: ['2026-10-01', '2026-10-31'], prev: ['2026-09-01', '2026-09-30'], text: 'ottobre 2026' },
+  custom: { label: 'Date a scelta', range: ['2026-09-01', '2026-10-23'], prev: null, text: '1 settembre – 23 ottobre 2026' }
+};
+
+var LISTS = [
+  { name: 'Automotive', it: 3820, en: 4510, share: 0.34, cshare: 0.36 },
+  { name: 'Green e mobilità', it: 2150, en: 2630, share: 0.16, cshare: 0.17 },
+  { name: 'Moto', it: 1940, en: 2280, share: 0.14, cshare: 0.15 },
+  { name: 'Food & Wine', it: 1120, en: 1460, share: 0.11, cshare: 0.10 },
+  { name: 'Tecnologia', it: 1610, en: 1980, share: 0.10, cshare: 0.09 },
+  { name: 'Lifestyle', it: 1380, en: 1720, share: 0.09, cshare: 0.08 },
+  { name: 'Travel', it: 890, en: 1240, share: 0.06, cshare: 0.05 }
+];
+
+var TESTATE = {
+  IT: [['Quattroruote', 'Automotive'], ['Motor1 Italia', 'Automotive'], ['InsideEVs Italia', 'Green'], ['Motociclismo', 'Moto'], ['Gambero Rosso', 'Food & Wine'], ['Il Sole 24 Ore', 'Economia'], ['Dissapore', 'Food & Wine'], ['Vaielettrico', 'Green']],
+  EN: [['Autocar', 'Automotive'], ['Top Gear', 'Automotive'], ['Eater', 'Food & Wine'], ['Electrive', 'Green'], ['Visordown', 'Moto'], ['Fine Dining Lovers', 'Food & Wine'], ['Fleet News', 'Trasporti'], ['Wallpaper*', 'Lifestyle']]
+};
+var T_AP = [0.032, 0.027, 0.022, 0.019, 0.017, 0.015, 0.013, 0.011];
+var T_CL = [0.045, 0.035, 0.03, 0.026, 0.022, 0.018, 0.016, 0.012];
+
+var MONTHS = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+var MONTHS_LONG = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+
+function fmt(n) { return Math.round(n).toLocaleString('it-IT'); }
+function pct(x) { return (x * 100).toFixed(1).replace('.', ',') + '%'; }
+function inRange(d, r) { return d >= r[0] && d <= r[1]; }
+function sum(list, k) { return list.reduce(function (a, d) { return a + d[k]; }, 0); }
+function segStyle(on) {
+  return 'min-height: 40px; padding: 0 14px; border: 0; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; ' +
+    (on ? 'background: #F39200; color: #2B2B2B;' : 'background: transparent; color: #4A4A4A;');
+}
+function delta(cur, prev, isRate) {
+  if (prev === null || prev === undefined) return { text: 'nessun confronto', color: '#6B6B6B' };
+  if (isRate) {
+    var pp = (cur - prev) * 100;
+    if (Math.abs(pp) < 0.05) return { text: '= rispetto al periodo prec.', color: '#5E5E5E' };
+    return { text: (pp > 0 ? '▲ +' : '▼ ') + pp.toFixed(1).replace('.', ',') + ' punti vs periodo prec.', color: pp > 0 ? '#2E6B3A' : '#A3261E' };
+  }
+  if (!prev) return { text: 'nessun dato nel periodo prec.', color: '#6B6B6B' };
+  var v = (cur - prev) / prev * 100;
+  if (Math.abs(v) < 0.5) return { text: '= rispetto al periodo prec.', color: '#5E5E5E' };
+  return { text: (v > 0 ? '▲ +' : '▼ ') + Math.round(v) + '% vs periodo prec.', color: v > 0 ? '#2E6B3A' : '#A3261E' };
+}
+function breakdownOf(list) {
+  var items = [
+    { label: 'Lettura della news', value: sum(list, 'news'), color: '#F39200' },
+    { label: 'Download (foto e allegati)', value: sum(list, 'dl'), color: '#F39200' },
+    { label: 'Versione web', value: sum(list, 'web'), color: '#F39200' },
+    { label: 'Altri link', value: sum(list, 'altro'), color: '#F39200' },
+    { label: 'Disiscrizione', value: sum(list, 'unsub'), color: '#8A8A84' }
+  ];
+  var tot = items.reduce(function (a, i) { return a + i.value; }, 0) || 1;
+  return items.map(function (i) {
+    return { label: i.label, value: fmt(i.value), pct: pct(i.value / tot), barStyle: 'height: 100%; border-radius: 5px; background: ' + i.color + '; width: ' + (i.value / tot * 100).toFixed(1) + '%' };
+  });
+}
+function testateOf(list) {
+  var acc = {};
+  list.forEach(function (d) {
+    TESTATE[d.lang].forEach(function (t, i) {
+      if (!acc[t[0]]) acc[t[0]] = { name: t[0], cat: t[1], ap: 0, cl: 0 };
+      acc[t[0]].ap += d.ap * T_AP[i];
+      acc[t[0]].cl += d.cu * T_CL[i];
+    });
+  });
+  return Object.keys(acc).map(function (k) { return acc[k]; })
+    .sort(function (a, b) { return b.ap - a.ap; })
+    .map(function (t) { return { name: t.name, cat: t.cat, ap: fmt(t.ap), cl: fmt(Math.max(1, t.cl)) }; });
+}
+function dateShort(s) { var p = s.split('-'); return parseInt(p[2], 10) + ' ' + MONTHS[parseInt(p[1], 10) - 1]; }
+function dateLong(s) { var p = s.split('-'); return parseInt(p[2], 10) + ' ' + MONTHS_LONG[parseInt(p[1], 10) - 1] + ' ' + p[0]; }
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { period: 'month', lang: 'all', metric: 'ap', sortKey: 'date', sortDir: -1, sel: null };
+  }
+
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var P = PERIODS[s.period];
+    var byLang = DEMS.filter(function (d) { return s.lang === 'all' || d.lang === s.lang; });
+    var cur = byLang.filter(function (d) { return inRange(d.date, P.range); });
+    var prev = P.prev ? byLang.filter(function (d) { return inRange(d.date, P.prev); }) : null;
+
+    function totals(list) {
+      if (!list) return null;
+      var inv = sum(list, 'invii'), ap = sum(list, 'ap'), cu = sum(list, 'cu');
+      return { n: list.length, inv: inv, ap: ap, cu: cu, or: inv ? ap / inv : 0, ctr: inv ? cu / inv : 0 };
+    }
+    var T = totals(cur), Tp = totals(prev);
+    function k(label, value, c, p, isRate, note) {
+      var d = delta(c, Tp ? p : null, isRate);
+      return { label: label, value: value, delta: d.text, deltaColor: d.color, note: note };
+    }
+    var kpis = [
+      k('DEM inviate', fmt(T.n), T.n, Tp && Tp.n, false, ''),
+      k('Invii totali', fmt(T.inv), T.inv, Tp && Tp.inv, false, 'Email inviate ai giornalisti'),
+      k('Aperture uniche', fmt(T.ap), T.ap, Tp && Tp.ap, false, ''),
+      k('Apertura media', pct(T.or), T.or, Tp && Tp.or, true, 'Aperture uniche su invii'),
+      k('Click unici', fmt(T.cu), T.cu, Tp && Tp.cu, false, 'Disiscrizioni escluse'),
+      k('CTR', pct(T.ctr), T.ctr, Tp && Tp.ctr, true, 'Click unici su invii')
+    ];
+
+    var periods = ['week', 'month', 'custom'].map(function (id) {
+      return { label: PERIODS[id].label, pressed: s.period === id ? 'true' : 'false', style: segStyle(s.period === id), pick: function () { self.setState({ period: id, sel: null }); } };
+    });
+    var metrics = [['ap', 'Aperture'], ['cu', 'Click unici'], ['or', 'Apertura %']].map(function (m) {
+      return { label: m[1], pressed: s.metric === m[0] ? 'true' : 'false', style: segStyle(s.metric === m[0]).replace('min-height: 40px', 'min-height: 36px'), pick: function () { self.setState({ metric: m[0] }); } };
+    });
+
+    var buckets;
+    if (s.period === 'week') {
+      buckets = WEEKS.map(function (w) {
+        var t = totals(byLang.filter(function (d) { return inRange(d.date, [w[0], w[1]]); }));
+        return { name: w[2], inv: t.inv, ap: t.ap, cu: t.cu };
+      });
+    } else {
+      buckets = MONTH_BASE.map(function (m) {
+        var parts = s.lang === 'all' ? [m.it, m.en] : [s.lang === 'IT' ? m.it : m.en];
+        return { name: m.name, inv: parts.reduce(function (a, p) { return a + p[0]; }, 0), ap: parts.reduce(function (a, p) { return a + p[1]; }, 0), cu: parts.reduce(function (a, p) { return a + p[2]; }, 0) };
+      });
+      [['2026-09-01', '2026-09-30', 'Set'], ['2026-10-01', '2026-10-31', 'Ott']].forEach(function (m) {
+        var t = totals(byLang.filter(function (d) { return inRange(d.date, [m[0], m[1]]); }));
+        buckets.push({ name: m[2], inv: t.inv, ap: t.ap, cu: t.cu });
+      });
+    }
+    var vals = buckets.map(function (b) { return s.metric === 'or' ? (b.inv ? b.ap / b.inv : 0) : b[s.metric]; });
+    var max = Math.max.apply(null, vals) || 1;
+    var trend = buckets.map(function (b, i) {
+      var v = vals[i];
+      var last = i === buckets.length - 1;
+      return {
+        name: b.name,
+        label: s.metric === 'or' ? (v ? pct(v) : '–') : (v ? fmt(v) : '–'),
+        barStyle: 'width: 100%; max-width: 56px; border-radius: 4px 4px 0 0; background: ' + (last ? '#F39200' : '#F6C27F') + '; height: ' + Math.max(2, Math.round(v / max * 170)) + 'px'
+      };
+    });
+
+    var cols = [['date', 'Data', 'left'], ['title', 'DEM', 'left'], ['lang', 'Lingua', 'left'], ['invii', 'Invii', 'right'], ['ap', 'Aperture', 'right'], ['or', 'Apertura %', 'right'], ['cu', 'Click unici', 'right'], ['ctr', 'CTR', 'right']].map(function (c) {
+      var active = s.sortKey === c[0];
+      return {
+        label: c[1],
+        arrow: active ? (s.sortDir > 0 ? '↑' : '↓') : '',
+        style: 'padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #DCDCD6; text-align: ' + c[2] + (active ? '; color: #2B2B2B' : ''),
+        sort: function () { self.setState({ sortKey: c[0], sortDir: active ? -s.sortDir : (c[0] === 'title' || c[0] === 'lang' ? 1 : -1) }); }
+      };
+    });
+    var enriched = cur.map(function (d) { return Object.assign({}, d, { or: d.ap / d.invii, ctr: d.cu / d.invii }); });
+    var bestId = enriched.length ? enriched.reduce(function (a, b) { return b.ctr > a.ctr ? b : a; }).id : null;
+    enriched.sort(function (a, b) {
+      var x = a[s.sortKey], y = b[s.sortKey];
+      return (x < y ? -1 : x > y ? 1 : 0) * s.sortDir;
+    });
+    var rows = enriched.map(function (d) {
+      var isSel = s.sel === d.id;
+      return {
+        id: d.id, title: d.title, lang: d.lang, dateLabel: dateShort(d.date),
+        inviiF: fmt(d.invii), apF: fmt(d.ap), orF: pct(d.or), cuF: fmt(d.cu), ctrF: pct(d.ctr),
+        best: d.id === bestId && enriched.length > 1,
+        trStyle: 'border-top: 1px solid #ECECE8; ' + (isSel ? 'background: #FDF1E0' : (d.id === bestId && enriched.length > 1 ? 'background: #FFFAF2' : '')),
+        open: function () { self.setState({ sel: d.id }); }
+      };
+    });
+
+    var selD = null, selKpis = [], selTimeline = [], selBreakdown = [], selTestate = [];
+    if (s.sel) {
+      var found = DEMS.filter(function (d) { return d.id === s.sel; })[0];
+      if (found) {
+        selD = { id: found.id, title: found.title, lang: found.lang, dateLong: dateLong(found.date) };
+        selKpis = [
+          { label: 'Invii', value: fmt(found.invii) },
+          { label: 'Aperture uniche', value: fmt(found.ap) },
+          { label: 'Apertura', value: pct(found.ap / found.invii) },
+          { label: 'Click unici', value: fmt(found.cu) },
+          { label: 'CTR', value: pct(found.cu / found.invii) },
+          { label: 'Disiscrizioni', value: fmt(found.unsub) }
+        ];
+        var shares = [0.38, 0.2, 0.12, 0.12, 0.09, 0.05, 0.04];
+        var names = ['0–2 h', '2–6 h', '6–12 h', '12–24 h', '2° g', '3° g', '4–7 g'];
+        selTimeline = shares.map(function (sh, i) {
+          return { name: names[i], label: fmt(found.ap * sh), barStyle: 'width: 100%; max-width: 44px; border-radius: 4px 4px 0 0; background: ' + (i === 0 ? '#F39200' : '#F6C27F') + '; height: ' + Math.round(sh / 0.38 * 120) + 'px' };
+        });
+        selBreakdown = breakdownOf([found]);
+        selTestate = testateOf([found]).slice(0, 6);
+      }
+    }
+
+    var listPerf = LISTS.map(function (l) { return { name: l.name, ap: T.ap * l.share, cl: T.cu * l.cshare }; });
+    var lmax = Math.max.apply(null, listPerf.map(function (l) { return l.ap; })) || 1;
+
+    return {
+      periodLabel: P.text,
+      isCustom: s.period === 'custom',
+      periods: periods, metrics: metrics,
+      kpis: kpis,
+      trendUnit: s.period === 'week' ? 'settimana per settimana' : 'mese per mese',
+      trend: trend,
+      breakdown: breakdownOf(cur),
+      cols: cols, rows: rows, noRows: rows.length === 0,
+      hasSel: !!selD, sel: selD || {}, selKpis: selKpis, selTimeline: selTimeline, selBreakdown: selBreakdown, selTestate: selTestate,
+      closeSel: function () { self.setState({ sel: null }); },
+      lists: LISTS.map(function (l) { return { name: l.name, itF: fmt(l.it), enF: fmt(l.en), totF: fmt(l.it + l.en) }; }),
+      listPerf: listPerf.map(function (l) { return { name: l.name, apF: fmt(l.ap), clF: fmt(l.cl), barStyle: 'height: 100%; border-radius: 5px; background: #F39200; width: ' + (l.ap / lmax * 100).toFixed(1) + '%' }; }),
+      topTestate: testateOf(cur).slice(0, 8)
+    };
+  }
+}
+</script>
+</body>
+</html>

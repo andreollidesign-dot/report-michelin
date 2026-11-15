@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Accedi – Report DEM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="mockup-banner">Mockup &middot; nessun dato reale</div>
+
+  <main class="auth-wrap">
+    <div class="auth-logo"><img src="logo-lulop.png" alt="Lulop.com"></div>
+    <div id="authHost"></div>
+    <p class="mock-hint">Per provare il mockup: qualsiasi email, password <strong>demo1234</strong>, codice <strong>123456</strong>. Il codice <strong>000000</strong> simula un codice scaduto.</p>
+  </main>
+
+<script src="data.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var L = window.LULOP, esc = L.esc;
+  var MOCK = { password: 'demo1234', code: '123456', expiredCode: '000000' };
+  var RESEND_SECONDS = 30;
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  var next = L.safeNext(new URLSearchParams(location.search).get('next'));
+  if (L.isAuthed()) { location.replace(next); return; }
+
+  var host = document.getElementById('authHost');
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { email: '', timer: null, left: 0, busy: false };
+
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function busyLabel(text) { return '<span class="spinner" aria-hidden="true"></span>' + esc(text); }
+  function mask(email) {
+    var p = email.split('@');
+    return p[0].charAt(0) + '***@' + p[1];
+  }
+  function setErr(input, errEl, msg) {
+    errEl.textContent = msg;
+    if (msg) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+  }
+
+  // ---------- passo 1: email e password ----------
+  function showStep1(focusId) {
+    stopTimer();
+    host.innerHTML =
+      '<form class="auth-card" id="f1" novalidate>' +
+        '<h1>Accedi al tuo report</h1>' +
+        '<div class="field"><label for="email">Email</label>' +
+          '<input class="input" id="email" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" enterkeyhint="next" aria-describedby="email-err" value="' + esc(state.email) + '">' +
+          '<p class="field-err" id="email-err"></p></div>' +
+        '<div class="field"><label for="pw">Password</label>' +
+          '<div class="pw"><input class="input" id="pw" name="password" type="password" autocomplete="current-password" enterkeyhint="go" aria-describedby="pw-err">' +
+          '<button type="button" class="pw-toggle" id="pwToggle" aria-label="Mostra password" aria-pressed="false">' + L.icon('eye', 22) + '</button></div>' +
+          '<p class="field-err" id="pw-err"></p></div>' +
+        '<a href="#" class="link-btn forgot" id="forgot">Password dimenticata?</a>' +
+        '<p class="hint" id="forgotNote" role="status"></p>' +
+        '<div id="credErr" role="alert"></div>' +
+        '<button type="submit" class="btn primary lg" id="go">Continua</button>' +
+      '</form>';
+
+    $('pwToggle').addEventListener('click', function () {
+      var pw = $('pw'), show = pw.type === 'password';
+      pw.type = show ? 'text' : 'password';
+      this.setAttribute('aria-pressed', String(show));
+      this.setAttribute('aria-label', show ? 'Nascondi password' : 'Mostra password');
+      this.innerHTML = L.icon(show ? 'eyeOff' : 'eye', 22);
+    });
+    $('forgot').addEventListener('click', function (e) {
+      e.preventDefault();
+      $('forgotNote').textContent = 'Nel mockup il recupero della password non è attivo.';
+    });
+    $('email').addEventListener('blur', function () {
+      var v = this.value.trim();
+      if (v && !EMAIL_RE.test(v)) setErr(this, $('email-err'), 'Controlla l’email: es. nome@michelin.com');
+    });
+    $('email').addEventListener('input', function () { if (EMAIL_RE.test(this.value.trim())) setErr(this, $('email-err'), ''); });
+    $('pw').addEventListener('input', function () { if (this.value) setErr(this, $('pw-err'), ''); });
+    $('f1').addEventListener('submit', submitStep1);
+
+    var f = $(focusId || (state.email ? 'pw' : 'email'));
+    if (f) f.focus();
+  }
+
+  function submitStep1(e) {
+    e.preventDefault();
+    if (state.busy) return;
+    var email = $('email'), pw = $('pw');
+    var v = email.value.trim();
+    $('credErr').innerHTML = '';
+    var emailMsg = !v ? 'Inserisci la tua email' : (!EMAIL_RE.test(v) ? 'Controlla l’email: es. nome@michelin.com' : '');
+    var pwMsg = pw.value ? '' : 'Inserisci la password';
+    setErr(email, $('email-err'), emailMsg);
+    setErr(pw, $('pw-err'), pwMsg);
+    if (emailMsg) { email.focus(); return; }
+    if (pwMsg) { pw.focus(); return; }
+
+    state.email = v;
+    state.busy = true;
+    var btn = $('go');
+    btn.disabled = true;
+    btn.innerHTML = busyLabel('Verifica in corso…');
+    wait(800).then(function () {
+      state.busy = false;
+      if (pw.value !== MOCK.password) {
+        btn.disabled = false;
+        btn.textContent = 'Continua';
+        pw.value = '';
+        $('credErr').innerHTML = '<div class="alert error"><p>Email o password non corretti. Controlla e riprova.</p></div>';
+        pw.focus();
+        return;
+      }
+      showStep2();
+    });
+  }
+
+  // ---------- passo 2: codice via email ----------
+  function showStep2() {
+    var boxes = '';
+    for (var i = 0; i < 6; i++) {
+      boxes += '<input class="input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="' + (i === 0 ? 'one-time-code' : 'off') + '" aria-label="Cifra ' + (i + 1) + ' di 6" data-i="' + i + '">';
+    }
+    host.innerHTML =
+      '<form class="auth-card" id="f2" novalidate>' +
+        '<h1>Controlla la tua email</h1>' +
+        '<p class="lead">Ti abbiamo inviato un codice a 6 cifre a <strong>' + esc(mask(state.email)) + '</strong>. È valido 10 minuti.</p>' +
+        '<label class="check"><input type="checkbox" id="remember" checked> Ricorda questo dispositivo per 30 giorni</label>' +
+        '<div class="field"><span class="label" id="code-l">Codice di verifica</span>' +
+          '<div class="code" id="code" role="group" aria-labelledby="code-l" aria-describedby="codeErr">' + boxes + '</div>' +
+          '<p class="field-err" id="codeErr" role="alert"></p></div>' +
+        '<button type="submit" class="btn primary lg" id="verify">Accedi</button>' +
+        '<div class="resend"><button type="button" class="link-btn" id="resend" disabled></button><p class="hint" id="resendNote" role="status"></p></div>' +
+        '<button type="button" class="link-btn" id="otherEmail" style="align-self:flex-start;margin-left:-6px">Usa un’altra email</button>' +
+      '</form>';
+
+    var inputs = [].slice.call(document.querySelectorAll('#code input'));
+    function clearCodeErr() {
+      $('codeErr').textContent = '';
+      inputs.forEach(function (b) { b.removeAttribute('aria-invalid'); });
+    }
+    function fill(digits, start) {
+      digits.slice(0, 6 - start).split('').forEach(function (d, k) { inputs[start + k].value = d; });
+      inputs[Math.min(start + digits.length, 5)].focus();
+      clearCodeErr();
+      if (complete()) verify();
+    }
+    function complete() { return inputs.every(function (b) { return b.value; }); }
+    inputs.forEach(function (b, i) {
+      b.addEventListener('input', function () {
+        var v = b.value.replace(/\D/g, '');
+        // Autocompilazione del codice da SMS/email: arriva tutto nella prima casella
+        if (v.length > 1) { fill(v, v.length >= 6 ? 0 : i); return; }
+        b.value = v;
+        clearCodeErr();
+        if (v && i < 5) inputs[i + 1].focus();
+        if (v && complete()) verify();
+      });
+      b.addEventListener('keydown', function (e) {
+        if (e.key === 'Backspace' && !b.value && i > 0) { e.preventDefault(); inputs[i - 1].value = ''; inputs[i - 1].focus(); }
+        else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); inputs[i - 1].focus(); }
+        else if (e.key === 'ArrowRight' && i < 5) { e.preventDefault(); inputs[i + 1].focus(); }
+      });
+      b.addEventListener('paste', function (e) {
+        var t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '');
+        if (!t) return;
+        e.preventDefault();
+        fill(t, t.length >= 6 ? 0 : i);
+      });
+      b.addEventListener('focus', function () { b.select(); });
+    });
+
+    function verify() {
+      if (state.busy) return;
+      var code = inputs.map(function (b) { return b.value; }).join('');
+      if (code.length < 6) {
+        $('codeErr').textContent = 'Inserisci tutte e 6 le cifre del codice.';
+        inputs.forEach(function (b) { if (!b.value) b.setAttribute('aria-invalid', 'true'); });
+        inputs.filter(function (b) { return !b.value; })[0].focus();
+        return;
+      }
+      state.busy = true;
+      var btn = $('verify');
+      btn.disabled = true;
+      btn.innerHTML = busyLabel('Verifica del codice…');
+      wait(700).then(function () {
+        state.busy = false;
+        btn.disabled = false;
+        btn.textContent = 'Accedi';
+        if (code === MOCK.code) {
+          L.saveAuth(state.email, $('remember').checked);
+          location.replace(next);
+          return;
+        }
+        inputs.forEach(function (b) { b.setAttribute('aria-invalid', 'true'); });
+        if (code === MOCK.expiredCode) {
+          $('codeErr').textContent = 'Il codice è scaduto. Richiedine uno nuovo.';
+          stopTimer();
+          setResend(0);
+          $('resend').focus();
+        } else {
+          $('codeErr').textContent = 'Codice non corretto. Controlla l’email e riprova.';
+          inputs.forEach(function (b) { b.value = ''; });
+          inputs[0].focus();
+        }
+      });
+    }
+
+    $('f2').addEventListener('submit', function (e) { e.preventDefault(); verify(); });
+    $('otherEmail').addEventListener('click', function () { showStep1('email'); });
+    $('resend').addEventListener('click', function () {
+      var btn = this;
+      btn.disabled = true;
+      btn.innerHTML = busyLabel('Invio in corso…');
+      $('resendNote').textContent = '';
+      wait(900).then(function () {
+        clearCodeErr();
+        inputs.forEach(function (b) { b.value = ''; });
+        $('resendNote').textContent = 'Ti abbiamo inviato un nuovo codice a ' + mask(state.email) + '.';
+        startTimer();
+        inputs[0].focus();
+      });
+    });
+
+    startTimer();
+    inputs[0].focus();
+  }
+
+  // ---------- "Invia di nuovo il codice" dopo 30 secondi ----------
+  function setResend(left) {
+    var btn = $('resend');
+    if (!btn) return;
+    state.left = left;
+    btn.disabled = left > 0;
+    btn.textContent = left > 0 ? 'Invia di nuovo il codice tra ' + left + ' s' : 'Invia di nuovo il codice';
+  }
+  function startTimer() {
+    stopTimer();
+    setResend(RESEND_SECONDS);
+    state.timer = setInterval(function () {
+      setResend(state.left - 1);
+      if (state.left <= 0) stopTimer();
+    }, 1000);
+  }
+  function stopTimer() { if (state.timer) { clearInterval(state.timer); state.timer = null; } }
+
+  showStep1();
+})();
+</script>
+</body>
+</html>

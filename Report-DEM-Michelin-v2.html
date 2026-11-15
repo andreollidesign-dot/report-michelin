@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report DEM Michelin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#F4F4F2;
+    --white:#FFFFFF;
+    --orange:#F39200;
+    --orange-dark:#A35200;
+    --orange-darker:#6E3700;
+    --text:#2B2B2B;
+    --text-strong:#1F1F1F;
+    --text-muted:#5E5E5E;
+    --text-caption:#4A4A4A;
+    --border:#E2E2DE;
+    --border-strong:#CFCFC8;
+    --border-soft:#ECECE8;
+    --track:#F0F0EC;
+    --neutral-bg:#ECECE8;
+    --green:#1E6B33;
+    --red:#A3261E;
+    --focus:#0B5FFF;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--cream);color:var(--text);
+    font-family:'Barlow',system-ui,sans-serif;font-size:15px;line-height:1.45;
+    overflow-x:hidden;
+  }
+  h1,h2,h3{font-family:'Barlow Condensed',sans-serif}
+  a{color:var(--orange-dark)}
+  a:hover{color:var(--orange-darker)}
+  button{font-family:inherit;cursor:pointer}
+  button:focus-visible,a:focus-visible,[tabindex]:focus-visible,input:focus-visible{
+    outline:3px solid var(--focus);outline-offset:2px;
+  }
+  .wrap{max-width:1200px;margin:0 auto;padding-left:clamp(16px,4vw,40px);padding-right:clamp(16px,4vw,40px)}
+  header.top{background:var(--white);border-bottom:4px solid #3D3D3D}
+  header.top .inner{padding:10px 0;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+  header.top .brand{display:flex;align-items:center;gap:14px}
+  header.top .brand img{height:48px;width:auto;display:block}
+  header.top .sep{width:1px;height:28px;background:var(--border-strong)}
+  header.top .title{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;letter-spacing:.5px}
+  header.top .meta{display:flex;align-items:center;gap:16px;font-size:14px;color:var(--text-muted)}
+  .mockup-banner{background:#FCE9CF;color:#5C3300;font-size:13px;text-align:center;padding:6px 16px}
+
+  main{padding:28px 0 56px;display:flex;flex-direction:column;gap:28px}
+  .page-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px}
+  .page-head h1{margin:0;font-weight:700;font-size:40px;line-height:1.05}
+  .page-head .sub{margin:6px 0 0;color:var(--text-muted);font-size:14px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{min-height:44px;padding:0 16px;border:1px solid var(--border-strong);background:var(--white);border-radius:8px;font-size:14px;color:var(--text);display:inline-flex;align-items:center;gap:8px}
+  .btn:hover{border-color:var(--orange);color:var(--orange-dark)}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:var(--text-strong);font-weight:600}
+  .btn.primary:hover{background:#DB8300;color:var(--text-strong)}
+
+  .period-bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;background:var(--white);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .period-nav{display:flex;align-items:center;gap:10px}
+  .period-nav .navbtn{min-height:40px;min-width:40px;border:1px solid var(--border-strong);background:var(--white);border-radius:6px;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .period-nav .navbtn:disabled{opacity:.35;cursor:not-allowed}
+  .period-nav .navbtn:hover:not(:disabled){border-color:var(--orange);color:var(--orange-dark)}
+  .period-label{font-weight:600;font-size:16px;min-width:150px;text-align:center}
+  .custom-dates{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  .custom-dates .field{display:flex;flex-direction:column;gap:4px}
+  .custom-dates label{font-size:13px;color:var(--text-muted)}
+  .custom-dates input{font:inherit;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;min-height:40px}
+  .custom-note{font-size:13px;color:var(--text-muted)}
+
+  .seg{display:flex;background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+  .seg button{min-height:40px;padding:0 14px;border:0;border-radius:6px;font-size:14px;font-weight:600;background:transparent;color:#4A4A4A;white-space:nowrap}
+  .seg button:hover{background:#ECECE8}
+  .seg button[aria-pressed="true"]{background:var(--orange);color:var(--text-strong)}
+  .seg.small button{min-height:34px;font-size:13px}
+
+  section.block{display:flex;flex-direction:column;gap:12px}
+  section.block > h2{margin:0;font-weight:600;font-size:24px}
+  .card-grid-main{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px}
+  .card-grid-secondary{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:12px;margin-top:4px}
+  .kpi-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px;min-height:118px;justify-content:center}
+  .kpi-card.main{min-height:150px;padding:20px}
+  .kpi-label{font-size:13px;color:var(--text-caption);display:flex;align-items:center;gap:6px}
+  .kpi-value{font-weight:700;line-height:1.1}
+  .kpi-card.main .kpi-value{font-size:44px}
+  .kpi-card:not(.main) .kpi-value{font-size:30px}
+  .kpi-delta{font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px}
+  .kpi-delta.up{color:var(--green)}
+  .kpi-delta.down{color:var(--red)}
+  .kpi-delta.flat,.kpi-delta.none{color:var(--text-muted)}
+
+  .info-btn{background:none;border:1px solid var(--border-strong);color:var(--text-muted);width:16px;height:16px;border-radius:50%;font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;position:relative;flex:0 0 auto}
+  .info-btn:hover,.info-btn.show{background:var(--orange);border-color:var(--orange);color:var(--text-strong)}
+  .info-tip{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);background:#2B2B2B;color:#fff;font-size:12px;font-weight:400;line-height:1.3;padding:8px 10px;border-radius:6px;width:200px;white-space:normal;text-align:left;z-index:30;display:none;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .info-btn:hover .info-tip,.info-btn:focus .info-tip,.info-btn.show .info-tip{display:block}
+
+  .two-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:16px}
+  .panel{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px}
+  .panel-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+  .panel-head h2,.panel-head h3{margin:0}
+  .panel p.hint{margin:0;font-size:13px;color:var(--text-muted)}
+
+  .bars{display:flex;align-items:flex-end;gap:8px;height:230px;border-bottom:1px solid var(--border-strong);padding-top:8px}
+  .bars.small{height:160px}
+  .bar-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%}
+  .bar-col .val{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap}
+  .bar{width:100%;max-width:56px;border-radius:4px 4px 0 0;background:#E09A49;border:1px solid var(--orange-dark)}
+  .bar.current{background:var(--orange);border-color:var(--orange-dark)}
+  .bar-names{display:flex;gap:8px}
+  .bar-names span{flex:1;min-width:0;text-align:center;font-size:12px;color:var(--text-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .breakdown-row{display:flex;flex-direction:column;gap:5px}
+  .breakdown-top{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+  .breakdown-top .n{font-weight:600}
+  .breakdown-top .n .sep{font-weight:400;color:var(--text-muted)}
+  .track{height:10px;background:var(--track);border-radius:5px;overflow:hidden}
+  .fill{height:100%;border-radius:5px;background:var(--orange);border:1px solid var(--orange-dark)}
+  .fill.muted{background:#B9B9B2;border-color:#8A8A84}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  .mini-table th{padding:6px 0;font-weight:600;text-align:left}
+  .mini-table th.r,.mini-table td.r{text-align:right}
+  .mini-table thead tr{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-caption)}
+  .mini-table tbody tr{border-top:1px solid var(--border-soft)}
+  .mini-table td{padding:8px 0}
+  .mini-table .cat{font-size:12px;color:var(--text-caption)}
+
+  .table-section-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+  .lang-filter-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+  .table-wrap{overflow-x:auto}
+  table.dem-table{min-width:860px}
+  table.dem-table thead tr{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-caption)}
+  table.dem-table th{padding:8px 10px;font-weight:600;border-bottom:1px solid var(--border-strong)}
+  table.dem-table th.active{color:var(--text)}
+  .sortbtn{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-transform:inherit;letter-spacing:inherit;display:inline-flex;align-items:center;gap:4px}
+  .sortbtn:hover{color:var(--orange-dark)}
+  table.dem-table td{padding:0}
+  .dem-row{cursor:pointer}
+  .dem-row:hover{background:#FAF8F4}
+  .dem-row:focus-visible{outline:3px solid var(--focus);outline-offset:-2px}
+  .dem-row.selected{background:var(--neutral-bg);box-shadow:inset 3px 0 0 0 #3D3D3D}
+  .dem-row td{padding:12px 10px;border-top:1px solid var(--border-soft)}
+  .dem-row td.r{text-align:right}
+  .dem-title-cell{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .dem-title-line{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+  .dem-title-line .title-text{text-decoration:underline;text-decoration-color:#D9D9D4;text-underline-offset:3px}
+  .dem-row:hover .title-text,.dem-row:focus-visible .title-text{color:var(--orange-dark);text-decoration-color:var(--orange-dark)}
+  .dem-id{font-size:12px;color:var(--text-caption)}
+  .lang-pill{font-size:12px;font-weight:600;border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px}
+  .star-icon{color:var(--orange-dark);font-size:13px;position:relative;display:inline-flex}
+  .partial-badge{font-size:11px;font-weight:600;background:var(--white);border:1px solid var(--orange-dark);color:var(--orange-dark);padding:1px 7px;border-radius:10px;white-space:nowrap}
+  .chevron{color:var(--text-caption);font-size:16px;text-align:right;padding-right:14px !important}
+  .empty-table-msg{margin:0;padding:24px 0;color:var(--text-muted)}
+
+  .cards-wrap{display:none;flex-direction:column;gap:10px}
+  .dem-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+  .dem-card.selected{background:var(--neutral-bg);box-shadow:inset 3px 0 0 0 #3D3D3D}
+  .dem-card .top-line{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .dem-card .metrics{display:flex;gap:18px;font-size:13px;color:var(--text-muted)}
+  .dem-card .metrics b{color:var(--text);font-size:15px;display:block}
+
+  footer.glossary{border-top:1px solid var(--border-strong);padding-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px 24px;font-size:13px;color:var(--text-muted)}
+  footer.glossary p{margin:0}
+  footer.glossary strong{color:var(--text)}
+
+  /* overlay + drawer */
+  .overlay{position:fixed;inset:0;background:rgba(20,18,15,.45);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s ease}
+  .overlay.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(640px,58vw);max-width:100%;background:var(--cream);z-index:41;box-shadow:-8px 0 24px rgba(0,0,0,.18);transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer-head{background:var(--white);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;flex-direction:column;gap:10px;flex:0 0 auto}
+  .drawer-nav{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .drawer-nav .navgroup{display:flex;gap:8px}
+  .drawer-nav button.navbtn{min-height:38px;padding:0 12px;border:1px solid var(--border-strong);background:var(--white);border-radius:6px;font-size:13px;display:flex;align-items:center;gap:6px}
+  .drawer-nav button.navbtn:disabled{opacity:.35;cursor:not-allowed}
+  .drawer-nav button.navbtn:hover:not(:disabled){border-color:var(--orange);color:var(--orange-dark)}
+  .drawer-close{min-height:38px;min-width:38px;border:1px solid var(--border-strong);background:var(--white);border-radius:6px;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .drawer-close:hover{border-color:var(--orange);color:var(--orange-dark)}
+  .drawer-eyebrow{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--orange-dark)}
+  .drawer-title{margin:0;font-weight:700;font-size:26px;line-height:1.15}
+  .drawer-body{overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:22px}
+  .drawer-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+  .drawer-kpi{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+  .drawer-kpi .l{font-size:13px;color:var(--text-caption)}
+  .drawer-kpi .v{font-weight:700;font-size:26px;line-height:1.1}
+  .drawer-sec{display:flex;flex-direction:column;gap:12px;background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .drawer-sec h3{margin:0;font-size:16px;font-weight:600}
+
+  /* demo state widget */
+  .demo-widget{position:fixed;left:12px;bottom:12px;z-index:50;background:#fff;border:1px dashed var(--border-strong);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  .demo-widget select{font:inherit;font-size:12px;border:1px solid var(--border-strong);border-radius:5px;padding:3px 4px}
+
+  /* skeleton */
+  .skeleton{display:flex;flex-direction:column;gap:20px}
+  .sk{border-radius:10px;background:linear-gradient(90deg,#E8E8E4 25%,#F2F2EF 37%,#E8E8E4 63%);background-size:400% 100%;animation:sk 1.3s ease infinite}
+  @keyframes sk{0%{background-position:100% 0}100%{background-position:0 0}}
+  .sk-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .sk-cards.secondary{grid-template-columns:repeat(4,1fr);margin-top:4px}
+  .sk-card{height:120px}
+  .sk-row{height:220px}
+  .sk-table{height:300px}
+
+  .state-msg{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:48px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;min-height:260px}
+  .state-msg .icon{font-size:34px}
+  .state-msg h2{margin:0;font-size:22px}
+  .state-msg p{margin:0;color:var(--text-muted);max-width:420px}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:#2B2B2B;color:#fff;font-size:14px;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:60}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  @media (max-width: 1024px){
+    .card-grid-secondary{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width: 768px){
+    .page-head h1{font-size:30px}
+    .card-grid-main{grid-template-columns:repeat(2,1fr)}
+    .card-grid-secondary{grid-template-columns:repeat(2,1fr)}
+    .kpi-card.main .kpi-value{font-size:32px}
+    .table-wrap{display:none}
+    .cards-wrap{display:flex}
+    .drawer{width:100%;top:auto;bottom:0;height:92vh;right:0;left:0;border-radius:14px 14px 0 0;transform:translateY(100%)}
+    .drawer.open{transform:translateY(0)}
+    .two-col{grid-template-columns:1fr}
+    .period-bar{flex-direction:column;align-items:stretch}
+  }
+</style>
+</head>
+<body>
+
+  <header class="top">
+    <div class="wrap inner">
+      <div class="brand">
+        <img src="logo-lulop.png" alt="Lulop.com">
+        <span class="sep" aria-hidden="true"></span>
+        <span class="title">Report</span>
+      </div>
+      <div class="meta">
+        <span>Michelin</span>
+        <a href="#">Esci</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="mockup-banner">Mockup &middot; tutti i numeri sono dati di esempio</div>
+
+  <main class="wrap" id="app"></main>
+
+  <div class="wrap">
+    <footer class="glossary">
+      <p><strong>Aperture uniche</strong>: destinatari che hanno aperto la DEM almeno una volta.</p>
+      <p><strong>Click unici</strong>: destinatari che hanno cliccato almeno un link, disiscrizioni escluse.</p>
+      <p><strong>CTR</strong>: click unici diviso invii. Stesso calcolo del report mensile.</p>
+      <p><strong>Aggiornamento</strong>: i dati si aggiornano ogni notte.</p>
+    </footer>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div id="drawerRoot"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="demo-widget">
+    <label for="demoSel">Stato demo</label>
+    <select id="demoSel">
+      <option value="normal">Normale</option>
+      <option value="empty">Periodo senza DEM</option>
+      <option value="loading">Caricamento</option>
+      <option value="error">Errore</option>
+    </select>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var TODAY = '2026-10-23';
+
+  var DEMS = [
+    [37388,'2026-09-02','IT','Michelin CrossClimate 3: la gamma si amplia a 40 misure',4120,1350,160,70,22,8,6],
+    [37402,'2026-09-04','EN','MICHELIN Guide Texas 2026: the new selection',5210,1610,150,55,30,10,9],
+    [37431,'2026-09-10','IT','Michelin al Salone Auto Torino: le novità in mostra',3980,1180,120,48,18,6,5],
+    [37456,'2026-09-16','EN','Michelin X Multi Energy: lower fuel consumption for long-haul trucks',4870,1420,130,62,21,9,7],
+    [37470,'2026-09-18','IT','Guida MICHELIN Italia 2027: annunciata la data della presentazione',4210,1530,210,60,28,11,4],
+    [37495,'2026-09-24','IT','Michelin Power Cup: il nuovo pneumatico per la pista',3890,1210,140,72,19,7,6],
+    [37508,'2026-09-29','EN','Michelin and sustainable mobility: tyres with 45% renewable materials',5020,1490,120,58,24,8,10],
+    [37522,'2026-10-01','IT','Michelin e la mobilità sostenibile: pneumatici con il 45% di materiali rinnovabili',4180,1390,170,80,25,9,5],
+    [37541,'2026-10-06','EN','MICHELIN Guide Nordic Countries 2026',5150,1720,190,60,33,11,8],
+    [37563,'2026-10-09','IT','Michelin Pilot Sport 5 Energy: la versione per le auto elettriche',4230,1460,195,92,27,10,6],
+    [37588,'2026-10-14','IT','Guida MICHELIN Italia 2027: le nuove Stelle Verdi',4260,1690,260,75,35,12,4],
+    [37602,'2026-10-15','EN','Michelin at EICMA 2026: what to expect',5090,1550,160,70,26,9,9],
+    [37627,'2026-10-20','IT','Michelin Anakee Road: il nuovo pneumatico per le maxi enduro',3940,1300,185,95,21,8,7],
+    [37649,'2026-10-21','EN','MICHELIN Guide Texas: three new stars',5180,1680,175,58,31,10,8],
+    [37661,'2026-10-22','IT','Michelin X Line Energy: meno consumi per il trasporto pesante',4050,1240,150,88,20,7,5]
+  ].map(function (d) {
+    return { id:d[0], date:d[1], lang:d[2], title:d[3], invii:d[4], ap:d[5], news:d[6], dl:d[7], web:d[8], altro:d[9], unsub:d[10], cu: Math.round((d[6]+d[7]+d[8]+d[9])*0.8) };
+  });
+
+  var MONTH_BASE = [
+    { name:'Mag', it:[12300,3900,470], en:[15100,4500,430] },
+    { name:'Giu', it:[16400,5300,610], en:[15300,4700,450] },
+    { name:'Lug', it:[12100,3800,440], en:[15000,4400,400] },
+    { name:'Ago', it:[4000,1100,110], en:[5000,1400,120] }
+  ];
+
+  var WEEKS = [
+    ['2026-08-31','2026-09-06','31 ago – 6 set'], ['2026-09-07','2026-09-13','7 – 13 set'],
+    ['2026-09-14','2026-09-20','14 – 20 set'], ['2026-09-21','2026-09-27','21 – 27 set'],
+    ['2026-09-28','2026-10-04','28 set – 4 ott'], ['2026-10-05','2026-10-11','5 – 11 ott'],
+    ['2026-10-12','2026-10-18','12 – 18 ott'], ['2026-10-19','2026-10-25','19 – 25 ott']
+  ];
+
+  var MONTH_LIST = [
+    { key:'2026-09', label:'Settembre 2026', trendName:'Set', range:['2026-09-01','2026-09-30'], prev:null },
+    { key:'2026-10', label:'Ottobre 2026', trendName:'Ott', range:['2026-10-01','2026-10-31'], prev:['2026-09-01','2026-09-30'] }
+  ];
+
+  var CUSTOM = { range:['2026-09-01','2026-10-23'], label:'1 settembre – 23 ottobre 2026' };
+
+  var LISTS = [
+    { name:'Automotive', it:3820, en:4510, share:0.34, cshare:0.36 },
+    { name:'Green e mobilità', it:2150, en:2630, share:0.16, cshare:0.17 },
+    { name:'Moto', it:1940, en:2280, share:0.14, cshare:0.15 },
+    { name:'Food & Wine', it:1120, en:1460, share:0.11, cshare:0.10 },
+    { name:'Tecnologia', it:1610, en:1980, share:0.10, cshare:0.09 },
+    { name:'Lifestyle', it:1380, en:1720, share:0.09, cshare:0.08 },
+    { name:'Travel', it:890, en:1240, share:0.06, cshare:0.05 }
+  ];
+
+  var TESTATE = {
+    IT: [['Quattroruote','Automotive'],['Motor1 Italia','Automotive'],['InsideEVs Italia','Green'],['Motociclismo','Moto'],['Gambero Rosso','Food & Wine'],['Il Sole 24 Ore','Economia'],['Dissapore','Food & Wine'],['Vaielettrico','Green']],
+    EN: [['Autocar','Automotive'],['Top Gear','Automotive'],['Eater','Food & Wine'],['Electrive','Green'],['Visordown','Moto'],['Fine Dining Lovers','Food & Wine'],['Fleet News','Trasporti'],['Wallpaper*','Lifestyle']]
+  };
+  var T_AP = [0.032,0.027,0.022,0.019,0.017,0.015,0.013,0.011];
+  var T_CL = [0.045,0.035,0.03,0.026,0.022,0.018,0.016,0.012];
+
+  var MONTHS = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  var MONTHS_LONG = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function pct(x){ return (x*100).toFixed(1).replace('.', ',') + '%'; }
+  function inRange(d, r){ return d >= r[0] && d <= r[1]; }
+  function sum(list, k){ return list.reduce(function(a,d){ return a + d[k]; }, 0); }
+  function dateShort(s){ var p = s.split('-'); return parseInt(p[2],10) + ' ' + MONTHS[parseInt(p[1],10)-1]; }
+  function dateLong(s){ var p = s.split('-'); return parseInt(p[2],10) + ' ' + MONTHS_LONG[parseInt(p[1],10)-1] + ' ' + p[0]; }
+  function daysSince(s){ return Math.round((Date.parse(TODAY) - Date.parse(s)) / 86400000); }
+
+  function delta(cur, prev, isRate){
+    if (prev === null || prev === undefined) return { icon:'–', text:'nessun confronto', cls:'none' };
+    if (isRate){
+      var pp = (cur - prev) * 100;
+      if (Math.abs(pp) < 0.05) return { icon:'–', text:'invariato vs periodo prec.', cls:'flat' };
+      return { icon: pp>0 ? '▲' : '▼', text:(pp>0?'+':'') + pp.toFixed(1).replace('.', ',') + ' punti vs periodo prec.', cls: pp>0?'up':'down' };
+    }
+    if (!prev) return { icon:'–', text:'nessun dato nel periodo prec.', cls:'none' };
+    var v = (cur - prev) / prev * 100;
+    if (Math.abs(v) < 0.5) return { icon:'–', text:'invariato vs periodo prec.', cls:'flat' };
+    return { icon: v>0 ? '▲' : '▼', text:(v>0?'+':'') + Math.round(v) + '% vs periodo prec.', cls: v>0?'up':'down' };
+  }
+
+  function breakdownOf(list){
+    var items = [
+      { label:'Lettura della news', value:sum(list,'news'), muted:false },
+      { label:'Download (foto e allegati)', value:sum(list,'dl'), muted:false },
+      { label:'Versione web', value:sum(list,'web'), muted:false },
+      { label:'Altri link', value:sum(list,'altro'), muted:false },
+      { label:'Disiscrizione', value:sum(list,'unsub'), muted:true }
+    ];
+    var tot = items.reduce(function(a,i){ return a+i.value; }, 0) || 1;
+    return items.map(function(i){
+      return { label:i.label, value:fmt(i.value), pct:pct(i.value/tot), width:(i.value/tot*100).toFixed(1), muted:i.muted };
+    });
+  }
+
+  function testateOf(list){
+    var acc = {};
+    list.forEach(function(d){
+      TESTATE[d.lang].forEach(function(t,i){
+        if (!acc[t[0]]) acc[t[0]] = { name:t[0], cat:t[1], ap:0, cl:0 };
+        acc[t[0]].ap += d.ap * T_AP[i];
+        acc[t[0]].cl += d.cu * T_CL[i];
+      });
+    });
+    return Object.keys(acc).map(function(k){ return acc[k]; })
+      .sort(function(a,b){ return b.ap - a.ap; })
+      .map(function(t){ return { name:t.name, cat:t.cat, ap:fmt(t.ap), cl:fmt(Math.max(1,t.cl)) }; });
+  }
+
+  function totals(list){
+    var inv = sum(list,'invii'), ap = sum(list,'ap'), cu = sum(list,'cu');
+    return { n:list.length, inv:inv, ap:ap, cu:cu, or: inv ? ap/inv : 0, ctr: inv ? cu/inv : 0 };
+  }
+
+  // ----- state -----
+  var state = {
+    periodType: 'month',
+    weekIndex: WEEKS.length - 1,
+    monthIndex: MONTH_LIST.length - 1,
+    metric: 'ap',
+    lang: 'all',
+    sortKey: 'date',
+    sortDir: -1,
+    sel: null,
+    demo: 'normal',
+    focusDrawerOnRender: false,
+    returnFocusId: null
+  };
+
+  function currentRange(){
+    if (state.periodType === 'week') return [WEEKS[state.weekIndex][0], WEEKS[state.weekIndex][1]];
+    if (state.periodType === 'month') return MONTH_LIST[state.monthIndex].range;
+    return CUSTOM.range;
+  }
+  function prevRange(){
+    if (state.periodType === 'week') return state.weekIndex > 0 ? [WEEKS[state.weekIndex-1][0], WEEKS[state.weekIndex-1][1]] : null;
+    if (state.periodType === 'month') return MONTH_LIST[state.monthIndex].prev;
+    return null;
+  }
+  function periodLabel(){
+    if (state.periodType === 'week') return 'settimana ' + WEEKS[state.weekIndex][2] + ' 2026';
+    if (state.periodType === 'month') return MONTH_LIST[state.monthIndex].label.toLowerCase();
+    return CUSTOM.label;
+  }
+
+  // ===== render =====
+  var app = document.getElementById('app');
+  var overlay = document.getElementById('overlay');
+  var drawerRoot = document.getElementById('drawerRoot');
+
+  function render(){
+    var range = currentRange();
+    var periodCur = DEMS.filter(function(d){ return inRange(d.date, range); });
+    var pr = prevRange();
+    var periodPrev = pr ? DEMS.filter(function(d){ return inRange(d.date, pr); }) : null;
+
+    app.innerHTML = headHtml() + periodBarHtml();
+
+    var contentHost = document.createElement('div');
+    contentHost.style.display = 'flex';
+    contentHost.style.flexDirection = 'column';
+    contentHost.style.gap = '28px';
+
+    if (state.demo === 'loading'){
+      contentHost.innerHTML = skeletonHtml();
+    } else if (state.demo === 'error'){
+      contentHost.innerHTML = errorHtml();
+    } else if (state.demo === 'empty'){
+      contentHost.innerHTML = emptyHtml();
+    } else {
+      contentHost.innerHTML = kpiHtml(periodCur, periodPrev) + andamentoHtml(periodCur) + pubblicoHtml(periodCur) + tabellaHtml(periodCur);
+    }
+    app.appendChild(contentHost);
+
+    renderDrawer();
+    bindGlobalOnce();
+  }
+
+  function headHtml(){
+    return (
+      '<section class="page-head">' +
+        '<div>' +
+          '<h1>Statistiche DEM</h1>' +
+          '<p class="sub">Michelin &middot; ' + esc(periodLabel()) + ' &middot; dati aggiornati il 23 ottobre 2026 alle 06:00</p>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="btn" type="button" data-action="copy-link">Copia link</button>' +
+          '<button class="btn primary" type="button" data-action="download-pdf">Scarica PDF</button>' +
+        '</div>' +
+      '</section>'
+    );
+  }
+
+  function periodBarHtml(){
+    var typeSeg = '<div class="seg" role="group" aria-label="Tipo di periodo">' +
+      ['week','month','custom'].map(function(t){
+        var label = t === 'week' ? 'Settimana' : (t === 'month' ? 'Mese' : 'Date a scelta');
+        return '<button type="button" aria-pressed="' + (state.periodType === t ? 'true' : 'false') + '" data-action="period-type" data-value="' + t + '">' + label + '</button>';
+      }).join('') + '</div>';
+
+    var navHtml = '';
+    if (state.periodType === 'week'){
+      navHtml = '<div class="period-nav">' +
+        '<button type="button" class="navbtn" data-action="week-prev" ' + (state.weekIndex===0?'disabled':'') + ' aria-label="Settimana precedente">&lsaquo;</button>' +
+        '<span class="period-label">' + esc(WEEKS[state.weekIndex][2]) + ' 2026</span>' +
+        '<button type="button" class="navbtn" data-action="week-next" ' + (state.weekIndex===WEEKS.length-1?'disabled':'') + ' aria-label="Settimana successiva">&rsaquo;</button>' +
+      '</div>';
+    } else if (state.periodType === 'month'){
+      navHtml = '<div class="period-nav">' +
+        '<button type="button" class="navbtn" data-action="month-prev" ' + (state.monthIndex===0?'disabled':'') + ' aria-label="Mese precedente">&lsaquo;</button>' +
+        '<span class="period-label">' + esc(MONTH_LIST[state.monthIndex].label) + '</span>' +
+        '<button type="button" class="navbtn" data-action="month-next" ' + (state.monthIndex===MONTH_LIST.length-1?'disabled':'') + ' aria-label="Mese successivo">&rsaquo;</button>' +
+      '</div>';
+    } else {
+      navHtml = '<div class="custom-dates">' +
+        '<div class="field"><label for="dal">Dal</label><input id="dal" type="date" value="' + CUSTOM.range[0] + '"></div>' +
+        '<div class="field"><label for="al">Al</label><input id="al" type="date" value="' + CUSTOM.range[1] + '"></div>' +
+        '<span class="custom-note">Con le date a scelta non c&rsquo;&egrave; il confronto con il periodo precedente.</span>' +
+      '</div>';
+    }
+
+    return '<div class="period-bar">' + navHtml + typeSeg + '</div>';
+  }
+
+  function kpiCard(label, value, d, infoKey, isMain){
+    var info = infoKey ? infoBtn(infoKey) : '';
+    return '<div class="kpi-card' + (isMain?' main':'') + '">' +
+      '<span class="kpi-label">' + esc(label) + info + '</span>' +
+      '<span class="kpi-value">' + value + '</span>' +
+      '<span class="kpi-delta ' + d.cls + '"><span aria-hidden="true">' + d.icon + '</span> ' + esc(d.text) + '</span>' +
+    '</div>';
+  }
+
+  var DEFS = {
+    aperture: 'Aperture uniche: destinatari che hanno aperto la DEM almeno una volta.',
+    apmedia: 'Apertura media: aperture uniche divise per invii, nel periodo selezionato.',
+    click: 'Click unici: destinatari che hanno cliccato almeno un link. Le disiscrizioni non sono conteggiate.',
+    ctr: 'CTR: click unici diviso invii. Stesso calcolo del report mensile che ricevi già.',
+    disiscrizioni: 'Disiscrizioni: destinatari che hanno scelto di non ricevere più le DEM.'
+  };
+  function infoBtn(key){
+    return '<button type="button" class="info-btn" data-action="info-toggle" aria-label="Definizione">i<span class="info-tip" role="tooltip">' + esc(DEFS[key]) + '</span></button>';
+  }
+
+  function kpiHtml(cur, prev){
+    var T = totals(cur), Tp = prev ? totals(prev) : null;
+    var dN = delta(T.n, Tp ? Tp.n : null, false);
+    var dInv = delta(T.inv, Tp ? Tp.inv : null, false);
+    var dAp = delta(T.ap, Tp ? Tp.ap : null, false);
+    var dOr = delta(T.or, Tp ? Tp.or : null, true);
+    var dCu = delta(T.cu, Tp ? Tp.cu : null, false);
+    var dCtr = delta(T.ctr, Tp ? Tp.ctr : null, true);
+
+    return (
+      '<section class="block" aria-labelledby="kpi-h">' +
+        '<h2 id="kpi-h">In sintesi</h2>' +
+        '<div class="card-grid-main">' +
+          kpiCard('Apertura media', pct(T.or), dOr, 'apmedia', true) +
+          kpiCard('CTR', pct(T.ctr), dCtr, 'ctr', true) +
+        '</div>' +
+        '<div class="card-grid-secondary">' +
+          kpiCard('DEM inviate', fmt(T.n), dN, null, false) +
+          kpiCard('Aperture uniche', fmt(T.ap), dAp, 'aperture', false) +
+          kpiCard('Click unici', fmt(T.cu), dCu, 'click', false) +
+          kpiCard('Invii totali', fmt(T.inv), dInv, null, false) +
+        '</div>' +
+      '</section>'
+    );
+  }
+
+  function andamentoHtml(cur){
+    var buckets, highlightIdx, trendTitle;
+    if (state.periodType === 'week'){
+      trendTitle = 'Andamento settimana per settimana';
+      buckets = WEEKS.map(function(w){
+        var t = totals(DEMS.filter(function(d){ return inRange(d.date, [w[0], w[1]]); }));
+        return { name: w[2].split(' ')[0] + ' ' + w[2].split(' ').slice(-1)[0], inv:t.inv, ap:t.ap, cu:t.cu };
+      });
+      highlightIdx = state.weekIndex;
+    } else {
+      trendTitle = 'Andamento mese per mese';
+      buckets = MONTH_BASE.map(function(m){
+        return { name:m.name, inv:m.it[0]+m.en[0], ap:m.it[1]+m.en[1], cu:m.it[2]+m.en[2] };
+      });
+      MONTH_LIST.forEach(function(m){
+        var t = totals(DEMS.filter(function(d){ return inRange(d.date, m.range); }));
+        buckets.push({ name:m.trendName, inv:t.inv, ap:t.ap, cu:t.cu });
+      });
+      highlightIdx = state.periodType === 'custom' ? buckets.length - 1 : (MONTH_BASE.length + state.monthIndex);
+    }
+    var vals = buckets.map(function(b){ return state.metric === 'or' ? (b.inv ? b.ap/b.inv : 0) : b[state.metric]; });
+    var max = Math.max.apply(null, vals) || 1;
+
+    var barsHtml = buckets.map(function(b, i){
+      var v = vals[i];
+      var h = Math.max(2, Math.round(v / max * 170));
+      var label = state.metric === 'or' ? (v ? pct(v) : '–') : (v ? fmt(v) : '–');
+      return '<div class="bar-col"><span class="val">' + label + '</span><div class="bar' + (i===highlightIdx?' current':'') + '" style="height:' + h + 'px"></div></div>';
+    }).join('');
+    var namesHtml = buckets.map(function(b){ return '<span>' + esc(b.name) + '</span>'; }).join('');
+
+    var metrics = [['ap','Aperture'],['cu','Click unici'],['or','Apertura %']];
+    var metricSeg = '<div class="seg small" role="group" aria-label="Metrica del grafico">' +
+      metrics.map(function(m){ return '<button type="button" aria-pressed="' + (state.metric===m[0]?'true':'false') + '" data-action="trend-metric" data-value="' + m[0] + '">' + m[1] + '</button>'; }).join('') +
+    '</div>';
+
+    var bk = breakdownOf(cur);
+    var breakdownHtml = bk.map(function(c){
+      return '<div class="breakdown-row"><div class="breakdown-top"><span>' + esc(c.label) + '</span><span class="n">' + c.value + ' <span class="sep">&middot; ' + c.pct + '</span></span></div>' +
+        '<div class="track"><div class="fill' + (c.muted?' muted':'') + '" style="width:' + c.width + '%"></div></div></div>';
+    }).join('');
+
+    return (
+      '<section class="two-col">' +
+        '<div class="panel">' +
+          '<div class="panel-head"><h2>' + esc(trendTitle) + '</h2>' + metricSeg + '</div>' +
+          '<div class="bars">' + barsHtml + '</div>' +
+          '<div class="bar-names">' + namesHtml + '</div>' +
+        '</div>' +
+        '<div class="panel">' +
+          '<div><h2>Su cosa hanno cliccato</h2><p class="hint">Click per tipo di link. Una persona pu&ograve; cliccare pi&ugrave; link.</p></div>' +
+          breakdownHtml +
+          '<p class="hint">Le disiscrizioni non sono conteggiate nei click unici n&eacute; nel CTR.</p>' +
+        '</div>' +
+      '</section>'
+    );
+  }
+
+  function pubblicoHtml(cur){
+    var listsHtml = LISTS.map(function(l){
+      return '<tr><td>' + esc(l.name) + '</td><td class="r">' + fmt(l.it) + '</td><td class="r">' + fmt(l.en) + '</td><td class="r" style="font-weight:600">' + fmt(l.it+l.en) + '</td></tr>';
+    }).join('');
+
+    var T = totals(cur);
+    var listPerf = LISTS.map(function(l){ return { name:l.name, ap:T.ap*l.share, cl:T.cu*l.cshare }; });
+    var lmax = Math.max.apply(null, listPerf.map(function(l){ return l.ap; })) || 1;
+    var listPerfHtml = listPerf.map(function(l){
+      return '<div class="breakdown-row"><div class="breakdown-top"><span>' + esc(l.name) + '</span><span><span class="n">' + fmt(l.ap) + '</span> <span class="sep">aperture &middot; ' + fmt(l.cl) + ' click</span></span></div>' +
+        '<div class="track"><div class="fill" style="width:' + (l.ap/lmax*100).toFixed(1) + '%"></div></div></div>';
+    }).join('');
+
+    var topT = testateOf(cur).slice(0, 8);
+    var topTHtml = topT.map(function(t){
+      return '<tr><td>' + esc(t.name) + ' <span class="cat">&middot; ' + esc(t.cat) + '</span></td><td class="r">' + t.ap + '</td><td class="r">' + t.cl + '</td></tr>';
+    }).join('');
+
+    return (
+      '<section class="block" aria-labelledby="pub-h">' +
+        '<div><h2 id="pub-h">Il pubblico raggiunto</h2><p class="hint">Solo dati aggregati: mostriamo le testate, mai i nomi o le email dei giornalisti.</p></div>' +
+        '<div class="two-col" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))">' +
+          '<div class="panel"><h3>Iscritti alle liste di interesse</h3>' +
+            '<table class="mini-table"><thead><tr><th>Lista</th><th class="r">IT</th><th class="r">EN</th><th class="r">Totale</th></tr></thead><tbody>' + listsHtml + '</tbody></table>' +
+            '<p class="hint">Un giornalista pu&ograve; essere iscritto a pi&ugrave; liste.</p>' +
+          '</div>' +
+          '<div class="panel"><div><h3>Risultati per lista di interesse</h3><p class="hint">Aperture uniche nel periodo, per interesse dichiarato dal giornalista</p></div>' + listPerfHtml + '</div>' +
+          '<div class="panel"><h3>Testate pi&ugrave; attive</h3>' +
+            '<table class="mini-table"><thead><tr><th>Testata</th><th class="r">Aperture</th><th class="r">Click</th></tr></thead><tbody>' + topTHtml + '</tbody></table>' +
+          '</div>' +
+        '</div>' +
+      '</section>'
+    );
+  }
+
+  function getTableRows(cur){
+    var byLang = cur.filter(function(d){ return state.lang === 'all' || d.lang === state.lang; });
+    var enriched = byLang.map(function(d){ return Object.assign({}, d, { or: d.ap/d.invii, ctr: d.cu/d.invii }); });
+    var bestId = enriched.length > 1 ? enriched.reduce(function(a,b){ return b.ctr > a.ctr ? b : a; }).id : null;
+    enriched.sort(function(a,b){
+      var x = a[state.sortKey], y = b[state.sortKey];
+      return (x < y ? -1 : x > y ? 1 : 0) * state.sortDir;
+    });
+    return { rows: enriched, bestId: bestId };
+  }
+
+  function tabellaHtml(cur){
+    var res = getTableRows(cur);
+    var rows = res.rows, bestId = res.bestId;
+
+    var cols = [['date','Data','left'],['title','DEM','left'],['lang','Lingua','left'],['invii','Invii','right'],['ap','Aperture','right'],['or','Apertura %','right'],['cu','Click unici','right'],['ctr','CTR','right']];
+    var theadHtml = cols.map(function(c){
+      var active = state.sortKey === c[0];
+      var arrow = active ? (state.sortDir > 0 ? '&uarr;' : '&darr;') : '';
+      return '<th scope="col" style="text-align:' + c[2] + '" class="' + (active?'active':'') + '"><button type="button" class="sortbtn" data-action="sort" data-key="' + c[0] + '">' + c[1] + ' <span aria-hidden="true">' + arrow + '</span></button></th>';
+    }).join('');
+
+    var bodyHtml = rows.map(function(d){
+      var isSel = state.sel === d.id;
+      var isBest = d.id === bestId;
+      var partial = daysSince(d.date) < 7;
+      var labelParts = [d.title, '#' + d.id, isBest ? 'DEM migliore del periodo' : '', partial ? 'dati in corso' : ''].filter(Boolean).join(', ');
+      return '<tr class="dem-row' + (isSel?' selected':'') + '" id="row-' + d.id + '" data-id="' + d.id + '" data-action="open-dem" tabindex="0" role="button" aria-label="Apri dettaglio DEM ' + esc(labelParts) + '">' +
+        '<td style="white-space:nowrap;color:var(--text-muted)">' + dateShort(d.date) + '</td>' +
+        '<td><div class="dem-title-cell">' +
+          '<div class="dem-title-line">' +
+            (isBest ? '<span class="star-icon" data-action="info-toggle" aria-label="DEM con il CTR più alto del periodo">&#9733;<span class="info-tip" role="tooltip">DEM con il CTR pi&ugrave; alto del periodo</span></span>' : '') +
+            '<span class="title-text">' + esc(d.title) + '</span>' +
+            (partial ? '<span class="partial-badge">Dati in corso</span>' : '') +
+          '</div>' +
+          '<span class="dem-id">#' + d.id + '</span>' +
+        '</div></td>' +
+        '<td><span class="lang-pill">' + d.lang + '</span></td>' +
+        '<td class="r">' + fmt(d.invii) + '</td>' +
+        '<td class="r">' + fmt(d.ap) + '</td>' +
+        '<td class="r">' + pct(d.or) + '</td>' +
+        '<td class="r">' + fmt(d.cu) + '</td>' +
+        '<td class="r" style="font-weight:600">' + pct(d.ctr) + '</td>' +
+        '<td class="chevron" aria-hidden="true">&rsaquo;</td>' +
+      '</tr>';
+    }).join('');
+
+    var cardsHtml = rows.map(function(d){
+      var isSel = state.sel === d.id;
+      var isBest = d.id === bestId;
+      var partial = daysSince(d.date) < 7;
+      return '<div class="dem-card' + (isSel?' selected':'') + '" id="card-' + d.id + '" data-id="' + d.id + '" data-action="open-dem" tabindex="0" role="button" aria-label="Apri dettaglio DEM ' + esc(d.title) + '">' +
+        '<div class="top-line"><div class="dem-title-line">' +
+          (isBest ? '<span class="star-icon" aria-hidden="true">&#9733;</span>' : '') +
+          '<strong>' + esc(d.title) + '</strong>' +
+        '</div><span class="chevron" aria-hidden="true">&rsaquo;</span></div>' +
+        '<div style="font-size:12px;color:var(--text-caption);display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+          '<span>' + dateShort(d.date) + '</span><span class="lang-pill">' + d.lang + '</span>' +
+          (partial ? '<span class="partial-badge">Dati in corso</span>' : '') +
+        '</div>' +
+        '<div class="metrics"><span>Apertura<b>' + pct(d.or) + '</b></span><span>CTR<b>' + pct(d.ctr) + '</b></span></div>' +
+      '</div>';
+    }).join('');
+
+    var langSeg = '<div class="seg small" role="group" aria-label="Filtro lingua">' +
+      [['all','Tutte'],['IT','IT'],['EN','EN']].map(function(l){
+        return '<button type="button" aria-pressed="' + (state.lang===l[0]?'true':'false') + '" data-action="lang-filter" data-value="' + l[0] + '">' + l[1] + '</button>';
+      }).join('') + '</div>';
+
+    return (
+      '<section class="block" aria-labelledby="tab-h">' +
+        '<div class="table-section-head"><h2 id="tab-h">Le DEM del periodo</h2></div>' +
+        '<div class="lang-filter-row">' + langSeg + '<span class="hint" style="font-size:13px;color:var(--text-muted)">' + rows.length + ' DEM nel periodo</span></div>' +
+        (rows.length === 0 ? '<p class="empty-table-msg">Nessuna DEM inviata in questo periodo.</p>' : '') +
+        '<div class="table-wrap"><table class="dem-table"><thead><tr>' + theadHtml + '<th aria-hidden="true"></th></tr></thead><tbody>' + bodyHtml + '</tbody></table></div>' +
+        '<div class="cards-wrap">' + cardsHtml + '</div>' +
+      '</section>'
+    );
+  }
+
+  function skeletonHtml(){
+    return (
+      '<div class="skeleton">' +
+        '<div class="sk-cards"><div class="sk sk-card"></div><div class="sk sk-card"></div></div>' +
+        '<div class="sk-cards secondary"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div>' +
+        '<div class="two-col"><div class="sk sk-row"></div><div class="sk sk-row"></div></div>' +
+        '<div class="sk sk-table"></div>' +
+      '</div>'
+    );
+  }
+
+  function emptyHtml(){
+    return (
+      '<div class="state-msg">' +
+        '<span class="icon" aria-hidden="true">&#128203;</span>' +
+        '<h2>Nessuna DEM in questo periodo</h2>' +
+        '<p>Non risultano DEM inviate a Michelin nel periodo selezionato. Prova a scegliere un altro periodo.</p>' +
+        '<button type="button" class="btn primary" data-action="demo-change-period">Cambia periodo</button>' +
+      '</div>'
+    );
+  }
+
+  function errorHtml(){
+    return (
+      '<div class="state-msg">' +
+        '<span class="icon" aria-hidden="true">&#9888;</span>' +
+        '<h2>Non riusciamo a recuperare i dati</h2>' +
+        '<p>C&rsquo;&egrave; stato un problema nel caricare le statistiche. Riprova tra qualche istante.</p>' +
+        '<button type="button" class="btn primary" data-action="demo-retry">Riprova</button>' +
+      '</div>'
+    );
+  }
+
+  // ----- drawer -----
+  function renderDrawer(){
+    overlay.className = 'overlay' + (state.sel ? ' open' : '');
+    if (!state.sel){
+      drawerRoot.innerHTML = '';
+      if (state.returnFocusId){
+        var el = document.getElementById(state.returnFocusId);
+        if (el) el.focus();
+        state.returnFocusId = null;
+      }
+      return;
+    }
+    var found = DEMS.filter(function(d){ return d.id === state.sel; })[0];
+    if (!found){ state.sel = null; renderDrawer(); return; }
+
+    var cur = getTableRows(DEMS.filter(function(d){ return inRange(d.date, currentRange()); }));
+    var orderIds = cur.rows.map(function(r){ return r.id; });
+    var pos = orderIds.indexOf(found.id);
+    var prevId = pos > 0 ? orderIds[pos-1] : null;
+    var nextId = pos >= 0 && pos < orderIds.length - 1 ? orderIds[pos+1] : null;
+
+    var partial = daysSince(found.date) < 7;
+    var selKpis = [
+      ['Invii', fmt(found.invii)],
+      ['Aperture uniche', fmt(found.ap)],
+      ['Apertura', pct(found.ap/found.invii)],
+      ['Click unici', fmt(found.cu)],
+      ['CTR', pct(found.cu/found.invii)],
+      ['Disiscrizioni', fmt(found.unsub)]
+    ];
+    var kpisHtml = selKpis.map(function(k){ return '<div class="drawer-kpi"><span class="l">' + k[0] + '</span><span class="v">' + k[1] + '</span></div>'; }).join('');
+
+    var shares = [0.38,0.2,0.12,0.12,0.09,0.05,0.04];
+    var names = ['0–2 h','2–6 h','6–12 h','12–24 h','2° g','3° g','4–7 g'];
+    var tmax = shares[0];
+    var timelineBars = shares.map(function(sh,i){
+      var v = found.ap * sh;
+      var h = Math.round(sh/tmax*120);
+      return '<div class="bar-col"><span class="val" style="font-size:11px">' + fmt(v) + '</span><div class="bar' + (i===0?' current':'') + '" style="height:' + h + 'px;max-width:44px"></div></div>';
+    }).join('');
+    var timelineNames = names.map(function(n){ return '<span style="font-size:11px">' + n + '</span>'; }).join('');
+
+    var selBreakdown = breakdownOf([found]);
+    var selBreakdownHtml = selBreakdown.map(function(c){
+      return '<div class="breakdown-row"><div class="breakdown-top"><span>' + esc(c.label) + '</span><span class="n">' + c.value + ' <span class="sep">&middot; ' + c.pct + '</span></span></div>' +
+        '<div class="track"><div class="fill' + (c.muted?' muted':'') + '" style="width:' + c.width + '%"></div></div></div>';
+    }).join('');
+
+    var selTestate = testateOf([found]).slice(0,6);
+    var selTestateHtml = selTestate.map(function(t){
+      return '<tr><td>' + esc(t.name) + ' <span class="cat">&middot; ' + esc(t.cat) + '</span></td><td class="r">' + t.ap + '</td><td class="r">' + t.cl + '</td></tr>';
+    }).join('');
+
+    drawerRoot.innerHTML =
+      '<div class="drawer open" role="dialog" aria-modal="true" aria-labelledby="drawer-title" id="drawerEl">' +
+        '<div class="drawer-head">' +
+          '<div class="drawer-nav">' +
+            '<div class="navgroup">' +
+              '<button type="button" class="navbtn" data-action="drawer-prev" ' + (prevId?'':'disabled') + '>&lsaquo; Precedente</button>' +
+              '<button type="button" class="navbtn" data-action="drawer-next" ' + (nextId?'':'disabled') + '>Successiva &rsaquo;</button>' +
+            '</div>' +
+            '<button type="button" class="drawer-close" id="drawerClose" data-action="drawer-close" aria-label="Chiudi dettaglio">&times;</button>' +
+          '</div>' +
+          '<span class="drawer-eyebrow">Dettaglio DEM #' + found.id + ' &middot; ' + found.lang + ' &middot; inviata il ' + dateLong(found.date) + (partial ? ' &middot; Dati in corso' : '') + '</span>' +
+          '<h2 class="drawer-title" id="drawer-title">' + esc(found.title) + '</h2>' +
+        '</div>' +
+        '<div class="drawer-body">' +
+          '<div class="drawer-kpis">' + kpisHtml + '</div>' +
+          '<div class="drawer-sec"><h3>Quando l&rsquo;hanno aperta</h3>' +
+            '<div class="bars small">' + timelineBars + '</div>' +
+            '<div class="bar-names">' + timelineNames + '</div>' +
+            '<p class="hint">Aperture uniche nelle ore e nei giorni dopo l&rsquo;invio</p>' +
+          '</div>' +
+          '<div class="drawer-sec"><h3>Su cosa hanno cliccato</h3>' + selBreakdownHtml + '</div>' +
+          '<div class="drawer-sec"><h3>Testate che l&rsquo;hanno aperta</h3>' +
+            '<table class="mini-table"><thead><tr><th>Testata</th><th class="r">Aperture</th><th class="r">Click</th></tr></thead><tbody>' + selTestateHtml + '</tbody></table>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    if (state.focusDrawerOnRender){
+      var closeBtn = document.getElementById('drawerClose');
+      if (closeBtn) closeBtn.focus();
+      state.focusDrawerOnRender = false;
+    }
+  }
+
+  function openDem(id, triggerId){
+    state.returnFocusId = triggerId || null;
+    state.focusDrawerOnRender = true;
+    state.sel = id;
+    history.pushState({ demOpen:id }, '', '#dem-' + id);
+    render();
+  }
+  function closeDrawer(){
+    if (!state.sel) return;
+    state.sel = null;
+    if (history.state && history.state.demOpen){
+      history.back();
+    } else {
+      history.replaceState({}, '', location.pathname + location.search);
+      render();
+    }
+  }
+  function navigateDem(dir){
+    var cur = getTableRows(DEMS.filter(function(d){ return inRange(d.date, currentRange()); }));
+    var ids = cur.rows.map(function(r){ return r.id; });
+    var pos = ids.indexOf(state.sel);
+    var newId = dir === 'next' ? ids[pos+1] : ids[pos-1];
+    if (newId === undefined) return;
+    openDem(newId, null);
+  }
+
+  // ----- toast -----
+  var toastTimer = null;
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.className = 'toast'; }, 2200);
+  }
+
+  // ----- events -----
+  var bound = false;
+  function bindGlobalOnce(){
+    if (bound) return;
+    bound = true;
+
+    document.addEventListener('click', function(e){
+      var t = e.target.closest('[data-action]');
+      if (!t) return;
+      var action = t.dataset.action;
+      if (action === 'period-type'){
+        state.periodType = t.dataset.value; state.sel = null; render();
+      } else if (action === 'week-prev'){
+        state.weekIndex = Math.max(0, state.weekIndex - 1); render();
+      } else if (action === 'week-next'){
+        state.weekIndex = Math.min(WEEKS.length - 1, state.weekIndex + 1); render();
+      } else if (action === 'month-prev'){
+        state.monthIndex = Math.max(0, state.monthIndex - 1); render();
+      } else if (action === 'month-next'){
+        state.monthIndex = Math.min(MONTH_LIST.length - 1, state.monthIndex + 1); render();
+      } else if (action === 'trend-metric'){
+        state.metric = t.dataset.value; render();
+      } else if (action === 'lang-filter'){
+        state.lang = t.dataset.value; render();
+      } else if (action === 'sort'){
+        var key = t.dataset.key;
+        state.sortDir = state.sortKey === key ? -state.sortDir : (key === 'title' || key === 'lang' ? 1 : -1);
+        state.sortKey = key; render();
+      } else if (action === 'open-dem'){
+        var row = t.closest('[data-id]');
+        openDem(parseInt(row.dataset.id, 10), row.id);
+      } else if (action === 'drawer-close'){
+        closeDrawer();
+      } else if (action === 'drawer-prev'){
+        navigateDem('prev');
+      } else if (action === 'drawer-next'){
+        navigateDem('next');
+      } else if (action === 'copy-link'){
+        var url = location.href;
+        if (navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(url).then(function(){ showToast('Link copiato'); }).catch(function(){ showToast('Impossibile copiare il link'); });
+        } else { showToast('Impossibile copiare il link'); }
+      } else if (action === 'download-pdf'){
+        window.print();
+      } else if (action === 'demo-retry'){
+        state.demo = 'normal'; render();
+      } else if (action === 'demo-change-period'){
+        state.demo = 'normal'; state.periodType = 'month'; state.monthIndex = MONTH_LIST.length - 1; render();
+      } else if (action === 'info-toggle'){
+        var isOpen = t.classList.contains('show');
+        document.querySelectorAll('.info-btn.show, .star-icon.show').forEach(function(x){ x.classList.remove('show'); });
+        if (!isOpen) t.classList.add('show');
+        e.stopPropagation();
+      }
+    });
+
+    document.addEventListener('click', function(e){
+      if (!e.target.closest('.info-btn') && !e.target.closest('.star-icon')){
+        document.querySelectorAll('.info-btn.show, .star-icon.show').forEach(function(x){ x.classList.remove('show'); });
+      }
+    });
+
+    document.addEventListener('keydown', function(e){
+      var t = e.target.closest('[data-action="open-dem"]');
+      if (t && (e.key === 'Enter' || e.key === ' ')){
+        e.preventDefault();
+        openDem(parseInt(t.dataset.id, 10), t.id);
+      }
+      if (e.key === 'Escape' && state.sel){
+        closeDrawer();
+      }
+    });
+
+    overlay.addEventListener('click', closeDrawer);
+
+    window.addEventListener('popstate', function(e){
+      var m = location.hash.match(/^#dem-(\d+)$/);
+      if (m && DEMS.some(function(d){ return d.id === parseInt(m[1], 10); })){
+        state.sel = parseInt(m[1], 10);
+        state.focusDrawerOnRender = false;
+      } else {
+        state.sel = null;
+      }
+      render();
+    });
+
+    document.getElementById('demoSel').addEventListener('change', function(e){
+      state.demo = e.target.value;
+      render();
+    });
+  }
+
+  // ----- init -----
+  function init(){
+    var m = location.hash.match(/^#dem-(\d+)$/);
+    if (m && DEMS.some(function(d){ return d.id === parseInt(m[1], 10); })){
+      state.sel = parseInt(m[1], 10);
+      history.replaceState({ demOpen:state.sel }, '', location.hash);
+    }
+    render();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

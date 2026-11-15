@@ -1,0 +1,5 @@
+.DS_Store
+*.zip
+
+# Bozze di email personali
+Email per *.md

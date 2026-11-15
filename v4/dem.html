@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEM – Report DEM Michelin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="top">
+    <div class="wrap inner">
+      <div class="brand">
+        <img src="logo-lulop.png" alt="Lulop.com">
+        <span class="sep" aria-hidden="true"></span>
+        <span class="title">Report</span>
+      </div>
+      <div class="meta">
+        <span>Michelin</span>
+        <a href="#">Esci</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="mockup-banner">Mockup &middot; tutti i numeri sono dati di esempio</div>
+
+  <main class="wrap" id="main">
+    <a class="back-link" id="back" href="index.html"></a>
+    <div id="demHost" class="stack"></div>
+  </main>
+
+  <div class="wrap"><footer class="glossary" id="glossary"></footer></div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="demo-widget">
+    <label for="demoSel">Stato demo</label>
+    <select id="demoSel">
+      <option value="normal">Normale</option>
+      <option value="loading">Caricamento</option>
+      <option value="error">Errore</option>
+    </select>
+  </div>
+
+<script src="data.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var L = window.LULOP, D = L.data, esc = L.esc, fmt = L.fmt, pct = L.pct;
+  var FROM_KEY = 'lulop-from-home';
+  var $ = function (id) { return document.getElementById(id); };
+
+  var id = parseInt(new URLSearchParams(location.search).get('id'), 10);
+  // Arrivati dalla home (anche dopo precedente/successiva o un ricaricamento): "Tutte le DEM" usa history.back()
+  var fromHome = !!(history.state && history.state.fromHome) || L.load(FROM_KEY) === true;
+  L.drop(FROM_KEY);
+  history.replaceState({ fromHome: fromHome }, '');
+
+  var state = { demo: 'normal' };
+
+  $('back').innerHTML = L.icon('chevronLeft', 20) + 'Tutte le DEM';
+  $('glossary').innerHTML = L.glossaryHtml();
+
+  function kpi(label, value, infoKey, key) {
+    return '<div class="dem-kpi' + (key ? ' key' : '') + '"><span class="l">' + esc(label) + (infoKey ? L.infoBtn(infoKey) : '') + '</span><span class="v">' + value + '</span></div>';
+  }
+
+  function pnHtml(d, dir) {
+    var isPrev = dir === 'prev';
+    var label = isPrev ? 'DEM precedente' : 'DEM successiva';
+    var dirHtml = isPrev ? L.icon('chevronLeft', 16) + label : label + L.icon('chevron', 16);
+    if (!d) {
+      return '<div class="pn off ' + dir + '"><span class="dir">' + dirHtml + '</span><span class="t">' + (isPrev ? 'Questa è la prima DEM' : 'Questa è la DEM più recente') + '</span></div>';
+    }
+    return '<a class="pn ' + dir + '" href="dem.html?id=' + d.id + '" data-pn rel="' + dir + '">' +
+      '<span class="dir">' + dirHtml + '</span><span class="t">' + esc(d.title) + '</span><span class="visually-hidden">, ' + L.dateLong(d.date) + '</span></a>';
+  }
+
+  function demHtml(d) {
+    var or = d.ap / d.invii, ctr = d.cu / d.invii;
+    var order = L.chrono();
+    var i = order.indexOf(d);
+
+    var timeline = D.TIMELINE.shares.map(function (s, k) {
+      var v = d.ap * s;
+      return { name: D.TIMELINE.names[k], value: v, label: fmt(v), current: k === 0 };
+    });
+    var testate = L.testateOf([d]).map(function (t) {
+      return '<tr><td>' + esc(t.name) + '</td><td class="cat">' + esc(t.cat) + '</td><td class="r">' + t.ap + '</td><td class="r">' + t.cl + '</td></tr>';
+    }).join('');
+
+    return (
+      '<header class="dem-head">' +
+        '<h1>' + esc(d.title) + '</h1>' +
+        '<div class="meta"><span>Inviata il ' + L.dateLong(d.date) + ' alle ' + d.time + '</span><span class="lang-pill">' + d.lang + '</span><span>#' + d.id + '</span>' +
+          (L.isPartial(d) ? '<span class="partial-badge">' + esc(L.completeLabel(d)) + '</span>' : '') + '</div>' +
+      '</header>' +
+
+      '<section aria-labelledby="num-h"><h2 class="visually-hidden" id="num-h">Numeri principali</h2><div class="dem-kpis">' +
+        kpi('Apertura', pct(or), 'apertura', true) +
+        kpi('CTR', pct(ctr), 'ctr', true) +
+        kpi('Aperture uniche', fmt(d.ap), 'aperture') +
+        kpi('Click unici', fmt(d.cu), 'click') +
+        kpi('Invii', fmt(d.invii)) +
+        kpi('Disiscrizioni', fmt(d.unsub), 'disiscrizioni') +
+      '</div></section>' +
+
+      '<div class="two-col">' +
+        '<section class="panel" aria-labelledby="int-h"><div><h2 class="sub-h" id="int-h">Pubblico per interesse</h2><p class="hint">Aperture e click di questa DEM per lista di interesse</p></div>' +
+          L.listBarsHtml(L.listsOf([d])) +
+          '<p class="hint">Un giornalista può essere iscritto a più liste.</p></section>' +
+        '<section class="panel" aria-labelledby="tes-h"><h2 class="sub-h" id="tes-h">Testate che l’hanno aperta</h2>' +
+          '<div class="table-scroll"><table class="mini-table"><thead><tr><th scope="col">Testata</th><th scope="col">Categoria</th><th scope="col" class="r">Aperture</th><th scope="col" class="r">Click</th></tr></thead><tbody>' + testate + '</tbody></table></div></section>' +
+        '<section class="panel" aria-labelledby="ora-h"><h2 class="sub-h" id="ora-h">Quando l’hanno aperta</h2>' +
+          L.barChart(timeline, { height: 120 }) +
+          '<p class="hint">Aperture uniche nelle ore e nei giorni dopo l’invio</p></section>' +
+        '<section class="panel" aria-labelledby="cli-h"><h2 class="sub-h" id="cli-h">Su cosa hanno cliccato</h2>' +
+          L.breakdownHtml([d]) +
+          '<p class="hint">Le disiscrizioni non sono conteggiate nei click unici né nel CTR.</p></section>' +
+      '</div>' +
+
+      '<nav class="prevnext" aria-label="Altre DEM in ordine cronologico">' + pnHtml(order[i - 1], 'prev') + pnHtml(order[i + 1], 'next') + '</nav>'
+    );
+  }
+
+  function skeleton() {
+    return '<div class="sk-stack" aria-hidden="true">' +
+      '<div class="sk" style="height:90px"></div>' +
+      '<div class="dem-kpis"><div class="sk" style="height:84px"></div><div class="sk" style="height:84px"></div><div class="sk" style="height:84px"></div><div class="sk" style="height:84px"></div><div class="sk" style="height:84px"></div><div class="sk" style="height:84px"></div></div>' +
+      '<div class="two-col"><div class="sk" style="height:300px"></div><div class="sk" style="height:300px"></div></div>' +
+    '</div><p class="visually-hidden" role="status">Caricamento dei dati in corso</p>';
+  }
+
+  function render() {
+    var d = L.demById(id);
+    var host = $('demHost');
+    if (state.demo === 'loading') host.innerHTML = skeleton();
+    else if (state.demo === 'error') host.innerHTML = L.stateMsg({ icon: 'alert', title: 'Non riusciamo a recuperare i dati', text: 'C’è stato un problema nel caricare le statistiche di questa DEM. Riprova tra qualche istante.', action: 'demo-retry', button: 'Riprova' });
+    else if (!d) host.innerHTML = L.stateMsg({ icon: 'inbox', title: 'DEM non trovata', text: 'Il link potrebbe essere incompleto, oppure la DEM non è più disponibile.', href: 'index.html', button: 'Vai al report' });
+    else host.innerHTML = demHtml(d);
+    document.title = (d ? d.title : 'DEM non trovata') + ' – Report DEM Michelin';
+  }
+
+  L.bindTooltips();
+
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (e.target.closest('#back') && fromHome && history.length > 1) {
+      e.preventDefault();
+      history.back();
+      return;
+    }
+    var pn = e.target.closest('a[data-pn]');
+    if (pn) {
+      // replace: la cronologia resta [home, scheda], così "Tutte le DEM" torna sempre alla home
+      e.preventDefault();
+      if (fromHome) L.store(FROM_KEY, true);
+      location.replace(pn.getAttribute('href'));
+      return;
+    }
+    var t = e.target.closest('[data-action="demo-retry"]');
+    if (t) { state.demo = 'normal'; $('demoSel').value = 'normal'; render(); }
+  });
+
+  $('demoSel').addEventListener('change', function (e) { state.demo = e.target.value; render(); });
+
+  render();
+})();
+</script>
+</body>
+</html>

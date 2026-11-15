@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invia a un contatto – Report DEM Michelin</title>
+<script src="data.js"></script>
+<script src="common.js"></script>
+<script>LULOP.requireAuth();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="top">
+    <div class="wrap inner">
+      <div class="brand">
+        <img src="logo-lulop.png" alt="Lulop.com">
+        <span class="sep" aria-hidden="true"></span>
+        <span class="title">Report</span>
+      </div>
+      <div class="meta">
+        <span>Michelin</span>
+        <a href="login.html" data-action="logout">Esci</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="mockup-banner">Mockup &middot; nessuna email viene inviata davvero</div>
+
+  <main class="wrap narrow" id="main">
+    <a class="back-link" id="back" href="index.html"></a>
+    <div class="page-title">
+      <h1>Invia a un contatto</h1>
+      <p>Manda subito un comunicato a chi hai appena conosciuto.</p>
+    </div>
+    <ol class="stepper" id="stepper" aria-label="Passaggi"></ol>
+    <div id="flow" class="stack" style="gap:16px"></div>
+    <section class="step hist-sec" aria-labelledby="hist-h">
+      <h2 id="hist-h">I tuoi ultimi invii</h2>
+      <ul class="hist" id="hist"></ul>
+    </section>
+  </main>
+
+  <dialog class="preview" id="preview" aria-labelledby="pv-h"></dialog>
+
+  <div class="demo-widget inline">
+    <label for="demoSel">Esito invio</label>
+    <select id="demoSel">
+      <option value="ok">Riuscito</option>
+      <option value="error">Errore</option>
+    </select>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  var L = window.LULOP, D = L.data, esc = L.esc;
+  var $ = function (id) { return document.getElementById(id); };
+  var LIMIT = D.SEND_LIMIT, QUICK = 5, MSG_MAX = 300;
+  var SENDS_KEY = 'lulop-sends', FROM_KEY = 'lulop-send-from-home';
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  var FIELDS = ['email', 'nome', 'cognome', 'tel', 'testata'];
+
+  var fromHome = !!(history.state && history.state.fromHome) || L.load(FROM_KEY) === true;
+  L.drop(FROM_KEY);
+  history.replaceState({ fromHome: fromHome }, '');
+
+  var uid = 0;
+  function newContact() { return { id: ++uid, nome: '', cognome: '', email: '', prefix: '+39', tel: '', testata: '', open: true, errors: {} }; }
+  var state = { step: 1, demId: null, contacts: [newContact()], message: '', consent: false, consentError: false, sending: false, sendError: false, done: null, showAll: false, viewContacts: false };
+
+  // ---------- dati ----------
+  function savedSends() { return L.load(SENDS_KEY) || []; }
+  function allSends() { return savedSends().concat(D.SEND_HISTORY).sort(function (a, b) { return a.at < b.at ? 1 : -1; }); }
+  function quickDems() {
+    var sched = D.SCHEDULED.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).map(function (s) { return L.findDem(s.id); });
+    var sent = L.latest(Math.max(0, QUICK - sched.length)).map(function (d) { return L.findDem(d.id); });
+    return sched.concat(sent).slice(0, QUICK);
+  }
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function searchDems(q) {
+    var n = norm(q.trim());
+    var all = D.SCHEDULED.map(function (s) { return L.findDem(s.id); }).concat(L.chrono().reverse().map(function (d) { return L.findDem(d.id); }));
+    return all.filter(function (d) { return norm(d.title).indexOf(n) > -1; });
+  }
+  function dem() { return L.findDem(state.demId); }
+  function fullName(c) { return (c.nome.trim() + ' ' + c.cognome.trim()).trim(); }
+  function joinNames(list) { return list.length === 1 ? list[0] : list.slice(0, -1).join(', ') + ' e ' + list[list.length - 1]; }
+  function plural(n, one, many) { return n === 1 ? one : many; }
+  function demWhen(d) { return d.scheduled ? '<span class="sched-badge">' + esc(L.scheduledLabel(d)) + '</span>' : '<span>Inviata il ' + L.dateShort(d.date) + '</span>'; }
+
+  // ---------- controlli ----------
+  function checkField(c, f) {
+    var v = (c[f] || '').trim();
+    if (f === 'nome') return v ? '' : 'Inserisci il nome';
+    if (f === 'cognome') return v ? '' : 'Inserisci il cognome';
+    if (f === 'email') {
+      if (!v) return 'Inserisci l’email';
+      if (!EMAIL_RE.test(v)) return 'Controlla l’email: es. nome@testata.it';
+      var dup = state.contacts.some(function (o) { return o !== c && o.email.trim().toLowerCase() === v.toLowerCase(); });
+      return dup ? 'Questa email è già in questo invio' : '';
+    }
+    if (f === 'testata') return v ? '' : 'Inserisci la testata o l’azienda';
+    if (!v) return 'Inserisci il numero di telefono';
+    return /^\d{6,15}$/.test(v.replace(/[\s.\-()]/g, '')) ? '' : 'Controlla il numero: solo cifre, senza prefisso';
+  }
+  function validate(c) {
+    c.errors = {};
+    FIELDS.forEach(function (f) { var m = checkField(c, f); if (m) c.errors[f] = m; });
+    return !Object.keys(c.errors).length;
+  }
+  function isEmpty(c) { return FIELDS.every(function (f) { return !(c[f] || '').trim(); }); }
+  function warningsFor(c) {
+    var v = c.email.trim().toLowerCase(), out = [];
+    if (!EMAIL_RE.test(v)) return out;
+    var already = allSends().some(function (s) { return s.demId === state.demId && s.contacts.some(function (x) { return x.email.toLowerCase() === v; }); });
+    if (already) out.push('Questa email ha già ricevuto questo comunicato');
+    if (D.JOURNALISTS.indexOf(v) > -1) out.push('Questa email è già tra i giornalisti Lulop');
+    return out;
+  }
+  function openContact() { return state.contacts.filter(function (c) { return c.open; })[0] || null; }
+
+  // ---------- disegno ----------
+  function stepperHtml() {
+    return [['Comunicato', 1], ['Contatti', 2], ['Invio', 3]].map(function (s) {
+      var n = s[1], done = state.step > n, cur = state.step === n;
+      return '<li class="' + (done ? 'done' : cur ? 'current' : '') + '"' + (cur ? ' aria-current="step"' : '') + '>' +
+        n + ' ' + s[0] + (done ? '<span class="visually-hidden"> (completato)</span>' : '') + '</li>';
+    }).join('');
+  }
+
+  function choiceHtml(d) {
+    return '<li><button type="button" class="choice" data-action="pick-dem" data-id="' + d.id + '">' +
+      '<span class="body"><span class="t">' + esc(d.title) + '</span>' +
+      '<span class="m">' + demWhen(d) + '</span></span>' +
+      '<span class="chev">' + L.icon('chevron') + '</span></button></li>';
+  }
+
+  function step1Html() {
+    if (state.step > 1 && dem()) {
+      var d = dem();
+      return '<section class="step" aria-label="Passo 1, comunicato scelto"><div class="step-row"><div><span class="k">1 · Comunicato</span><strong>' + esc(d.title) + '</strong>' +
+        '<span class="m">' + demWhen(d) + '</span></div>' +
+        '<div class="row-actions"><button type="button" class="link-btn" data-action="view-dem" aria-label="Visualizza il comunicato">Visualizza</button>' +
+        '<button type="button" class="link-btn" data-action="change-dem" aria-label="Modifica il comunicato scelto">Modifica</button></div></div></section>';
+    }
+    return '<section class="step" aria-labelledby="s1-h"><h2 id="s1-h" tabindex="-1">Scegli un comunicato</h2>' +
+      '<ul class="choice-list">' + quickDems().map(choiceHtml).join('') + '</ul>' +
+      '<div class="search-box"><div class="field"><label for="demSearch">Cerca un comunicato più vecchio</label>' +
+        '<input class="input" id="demSearch" type="search" placeholder="Scrivi una parola del titolo" autocomplete="off" enterkeyhint="search" aria-describedby="searchStatus"></div>' +
+        '<p class="hint" id="searchStatus" role="status"></p><ul class="choice-list" id="searchResults"></ul></div>' +
+    '</section>';
+  }
+
+  function fieldHtml(c, f, label, attrs) {
+    var id = 'c' + c.id + '-' + f, err = c.errors[f] || '';
+    return '<div class="field"><label for="' + id + '">' + label + '</label>' +
+      '<input class="input" id="' + id + '" data-c="' + c.id + '" data-f="' + f + '" value="' + esc(c[f]) + '" autocomplete="off" aria-describedby="' + id + '-err' + (f === 'email' ? ' ' + id + '-warn' : '') + '"' + (err ? ' aria-invalid="true"' : '') + ' ' + attrs + '>' +
+      '<p class="field-err" id="' + id + '-err">' + esc(err) + '</p>' +
+      (f === 'email' ? '<div class="field-warn" id="' + id + '-warn">' + warningsFor(c).map(function (w) { return '<p>' + esc(w) + '</p>'; }).join('') + '</div>' : '') +
+    '</div>';
+  }
+
+  function contactHtml(c, idx) {
+    if (!c.open) {
+      return '<div class="contact-row"><div class="who"><strong>' + esc(fullName(c)) + '</strong><span>' + esc(c.testata) + ' · ' + esc(c.email) + '</span></div>' +
+        '<button type="button" class="link-btn" data-action="edit-contact" data-c="' + c.id + '" aria-label="Modifica ' + esc(fullName(c)) + '">Modifica</button>' +
+        '<button type="button" class="link-btn danger" data-action="remove-contact" data-c="' + c.id + '" aria-label="Rimuovi ' + esc(fullName(c)) + '">Rimuovi</button></div>';
+    }
+    var tid = 'c' + c.id + '-tel', terr = c.errors.tel || '';
+    var prefixes = D.PREFIXES.map(function (p) { return '<option value="' + p[0] + '" title="' + esc(p[2]) + '"' + (p[0] === c.prefix ? ' selected' : '') + '>' + p[0] + ' ' + p[1] + '</option>'; }).join('');
+    return '<fieldset class="contact"><legend>Contatto ' + (idx + 1) + '</legend>' +
+      fieldHtml(c, 'email', 'Email', 'type="email" inputmode="email" autocapitalize="none" spellcheck="false" enterkeyhint="next"') +
+      '<div class="row2">' +
+        fieldHtml(c, 'nome', 'Nome', 'type="text" autocapitalize="words" enterkeyhint="next"') +
+        fieldHtml(c, 'cognome', 'Cognome', 'type="text" autocapitalize="words" enterkeyhint="next"') +
+      '</div>' +
+      '<div class="field"><label for="' + tid + '">Telefono</label>' +
+        '<div class="tel"><select class="input" data-c="' + c.id + '" data-f="prefix" aria-label="Prefisso internazionale" autocomplete="off">' + prefixes + '</select>' +
+        '<input class="input" id="' + tid + '" data-c="' + c.id + '" data-f="tel" type="tel" inputmode="tel" autocomplete="off" enterkeyhint="next" value="' + esc(c.tel) + '" aria-describedby="' + tid + '-err"' + (terr ? ' aria-invalid="true"' : '') + '></div>' +
+        '<p class="field-err" id="' + tid + '-err">' + esc(terr) + '</p></div>' +
+      fieldHtml(c, 'testata', 'Testata o azienda', 'type="text" autocapitalize="words" enterkeyhint="done"') +
+      (state.contacts.length > 1 ? '<div class="contact-foot"><button type="button" class="link-btn danger" data-action="remove-contact" data-c="' + c.id + '">Rimuovi contatto</button></div>' : '') +
+    '</fieldset>';
+  }
+
+  function step2Html() {
+    if (state.step < 2) return '';
+    if (state.step > 2) {
+      var names = state.contacts.map(fullName);
+      return '<section class="step" aria-label="Passo 2, contatti"><div class="step-row"><div><span class="k">2 · Contatti</span><strong>' +
+        state.contacts.length + ' ' + plural(state.contacts.length, 'contatto', 'contatti') + '</strong><span class="m">' + esc(names.join(', ')) + '</span></div>' +
+        '<div class="row-actions"><button type="button" class="link-btn" data-action="view-contacts" aria-expanded="' + state.viewContacts + '" aria-controls="contactsView">Visualizza</button>' +
+        '<button type="button" class="link-btn" data-action="change-contacts" aria-label="Modifica i contatti">Modifica</button></div>' +
+        (state.viewContacts ? '<div class="view-box" id="contactsView"><ul>' + state.contacts.map(function (c) {
+          return '<li><strong>' + esc(fullName(c)) + '</strong><span>' + esc(c.testata) + '</span><span>' + esc(c.email) + ' · ' + esc(c.prefix + ' ' + c.tel) + '</span></li>';
+        }).join('') + '</ul></div>' : '') + '</div></section>';
+    }
+    var n = state.contacts.length, full = n >= LIMIT;
+    return '<section class="step" aria-labelledby="s2-h"><form id="f2" novalidate class="stack" style="gap:14px">' +
+      '<div class="contacts-head"><h2 id="s2-h" tabindex="-1">Contatti</h2><span class="count" id="count">' + n + ' di ' + LIMIT + ' contatti</span></div>' +
+      state.contacts.map(contactHtml).join('') +
+      '<div class="add-row"><button type="button" class="link-btn" id="addBtn" data-action="add-contact"' + (full ? ' disabled aria-describedby="limitNote"' : '') + '>' + L.icon('plus', 18) + 'Aggiungi un altro contatto</button>' +
+        (full ? '<p class="hint" id="limitNote">Hai raggiunto il limite di ' + LIMIT + ' contatti per invio.</p>' : '') + '</div>' +
+      '<div class="field"><label for="msg">Messaggio personale <span style="font-weight:400;color:var(--text-muted)">(facoltativo)</span></label>' +
+        '<textarea class="input" id="msg" maxlength="' + MSG_MAX + '" autocomplete="off" aria-describedby="msgCount" placeholder="Piacere di averla conosciuta a EICMA, ecco l’articolo di cui parlavamo.">' + esc(state.message) + '</textarea>' +
+        '<p class="counter" id="msgCount">' + state.message.length + '/' + MSG_MAX + '</p></div>' +
+      '<div class="field"><label class="check"><input type="checkbox" id="consent"' + (state.consent ? ' checked' : '') + ' aria-describedby="consent-err"' + (state.consentError ? ' aria-invalid="true"' : '') + '> I contatti hanno acconsentito a ricevere questa comunicazione</label>' +
+        '<p class="field-err" id="consent-err">' + (state.consentError ? 'Conferma il consenso per continuare' : '') + '</p></div>' +
+      '<div class="sticky-cta"><button type="submit" class="btn primary lg">Continua</button></div>' +
+    '</form></section>';
+  }
+
+  function sendLabel() {
+    var n = state.contacts.length;
+    return (dem().scheduled ? 'Programma per ' : 'Invia a ') + n + ' ' + plural(n, 'contatto', 'contatti');
+  }
+
+  function step3Html() {
+    if (state.step !== 3) return '';
+    var d = dem(), list = state.contacts, many = list.length > 3;
+    var shown = many && !state.showAll ? list.slice(0, 3) : list;
+    return '<section class="step" aria-labelledby="s3-h"><h2 id="s3-h" tabindex="-1">Controlla e invia</h2>' +
+      '<div class="sum"><span class="k">Comunicato</span><span class="v">' + esc(d.title) + '</span><span class="m" style="display:flex;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--text-caption)">' + demWhen(d) + '</span></div>' +
+      '<div class="sum"><span class="k">Contatti (' + list.length + ')</span><ul id="sumContacts">' +
+        shown.map(function (c) { return '<li><strong>' + esc(fullName(c)) + '</strong> <span>· ' + esc(c.testata) + ' · ' + esc(c.email) + '</span></li>'; }).join('') + '</ul>' +
+        (many ? '<button type="button" class="link-btn" style="align-self:flex-start;margin-left:-6px" data-action="toggle-all" aria-expanded="' + state.showAll + '" aria-controls="sumContacts">' + (state.showAll ? 'Mostra meno' : 'Mostra tutti (' + list.length + ')') + '</button>' : '') + '</div>' +
+      '<div class="sum"><span class="k">Messaggio personale</span>' + (state.message.trim() ? '<p class="quote">' + esc(state.message.trim()) + '</p>' : '<p class="quote" style="color:var(--text-muted)">Nessun messaggio</p>') + '</div>' +
+      '<button type="button" class="btn" style="align-self:flex-start" data-action="preview">' + L.icon('eye') + 'Vedi anteprima</button>' +
+      (state.sendError ? '<div class="alert error" role="alert" id="sendErr" tabindex="-1" style="outline:none"><p><strong>Invio non riuscito.</strong> Controlla la connessione e riprova: i dati inseriti sono al sicuro.</p>' +
+        '<button type="button" class="btn" style="align-self:flex-start" data-action="send">Riprova</button></div>' : '') +
+      '<div class="sticky-cta"><button type="button" class="btn primary lg" data-action="send" id="sendBtn"' + (state.sending ? ' disabled aria-busy="true"' : '') + '>' +
+        (state.sending ? '<span class="spinner" aria-hidden="true"></span>Invio in corso…' : L.icon('send') + esc(sendLabel())) + '</button></div>' +
+    '</section>';
+  }
+
+  function doneHtml() {
+    var r = state.done, n = r.names.length, text;
+    if (r.scheduled) {
+      text = plural(n, 'Riceverà', 'Riceveranno') + ' il comunicato il ' + L.dayMonth(r.dem.date) + ' alle ' + r.dem.time + ', insieme all’invio programmato.';
+    } else {
+      text = joinNames(r.names) + ' ' + plural(n, 'ha ricevuto', 'hanno ricevuto') + ' il comunicato.';
+    }
+    return '<section class="done-card" aria-labelledby="done-h">' + L.icon('check', 48) +
+      '<h2 id="done-h" tabindex="-1">Fatto!</h2><p>' + esc(text) + '</p>' +
+      (r.scheduled ? '<p class="hint">Destinatari: ' + esc(joinNames(r.names)) + '</p>' : '') +
+      '<p class="hint">' + esc(r.dem.title) + '</p>' +
+      '<div class="actions-col"><button type="button" class="btn primary lg" data-action="another">' + L.icon('plus') + 'Invia a un altro contatto</button>' +
+        '<a class="btn lg" href="index.html" data-action="back-report">Torna al report</a></div>' +
+    '</section>';
+  }
+
+  function histHtml() {
+    var list = allSends();
+    if (!list.length) return '<li class="hint">Nessun invio ancora.</li>';
+    return list.map(function (s) {
+      var d = L.findDem(s.demId), day = s.at.slice(0, 10), time = s.at.slice(11, 16);
+      return '<li><div class="top"><span>' + L.dateShort(day) + ', ' + time + '</span>' +
+        (s.status === 'scheduled' ? '<span class="sched-badge">Programmata</span>' : '<span class="sent-badge">Inviata</span>') + '</div>' +
+        '<span class="t">' + esc(d ? d.title : 'DEM #' + s.demId) + '</span>' +
+        '<span class="who">' + esc(s.contacts.map(function (c) { return c.nome + ' ' + c.cognome; }).join(', ')) + '</span></li>';
+    }).join('');
+  }
+
+  function render() {
+    $('stepper').innerHTML = stepperHtml();
+    $('stepper').hidden = !!state.done;
+    $('flow').innerHTML = state.done ? doneHtml() : step1Html() + step2Html() + step3Html();
+    $('hist').innerHTML = histHtml();
+  }
+
+  function focusEl(id, scroll) {
+    var el = $(id);
+    if (!el) return;
+    el.focus({ preventScroll: !scroll });
+    if (scroll) el.scrollIntoView({ block: 'start' });
+  }
+  function focusFirstError(c) {
+    var f = FIELDS.filter(function (x) { return c.errors[x]; })[0];
+    if (f) focusEl('c' + c.id + '-' + f, false);
+  }
+
+  // ---------- azioni ----------
+  function pickDem(id) {
+    state.demId = id;
+    state.step = 2;
+    render();
+    var c = openContact();
+    if (c) focusEl('c' + c.id + '-email', false); else focusEl('s2-h', false);
+    $('s2-h').closest('.step').scrollIntoView({ block: 'start' });
+  }
+
+  // Il contatto aperto va chiuso prima di aprirne o aggiungerne un altro
+  function closeOpen(exceptId) {
+    var o = openContact();
+    if (!o || o.id === exceptId) return true;
+    if (isEmpty(o) && state.contacts.length > 1) { state.contacts.splice(state.contacts.indexOf(o), 1); return true; }
+    if (!validate(o)) { render(); focusFirstError(o); return false; }
+    o.open = false;
+    return true;
+  }
+
+  function addContact() {
+    if (state.contacts.length >= LIMIT || !closeOpen()) return;
+    var c = newContact();
+    state.contacts.push(c);
+    render();
+    focusEl('c' + c.id + '-email', false);
+  }
+
+  function editContact(id) {
+    if (!closeOpen(id)) return;
+    var c = state.contacts.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    c.open = true;
+    render();
+    focusEl('c' + c.id + '-email', false);
+  }
+
+  function removeContact(id) {
+    state.contacts = state.contacts.filter(function (x) { return x.id !== id; });
+    if (!state.contacts.length) state.contacts.push(newContact());
+    render();
+    focusEl(openContact() && state.contacts.length === 1 ? 'c' + state.contacts[0].id + '-email' : 'addBtn', false);
+  }
+
+  function continueToReview() {
+    var o = openContact(), ok = true;
+    if (o && isEmpty(o) && state.contacts.length > 1) { state.contacts.splice(state.contacts.indexOf(o), 1); o = null; }
+    state.contacts.forEach(function (c) { if (!validate(c)) { c.open = true; ok = false; } });
+    state.consentError = !state.consent;
+    if (!ok || state.consentError) {
+      render();
+      var bad = state.contacts.filter(function (c) { return Object.keys(c.errors).length; })[0];
+      if (bad) focusFirstError(bad); else focusEl('consent', false);
+      return;
+    }
+    state.contacts.forEach(function (c) { c.open = false; });
+    state.step = 3;
+    state.showAll = false;
+    render();
+    focusEl('s3-h', true);
+  }
+
+  function send() {
+    if (state.sending) return;
+    state.sending = true;
+    state.sendError = false;
+    render();
+    setTimeout(function () {
+      state.sending = false;
+      if ($('demoSel').value === 'error') {
+        state.sendError = true;
+        render();
+        focusEl('sendErr', false);
+        return;
+      }
+      var d = dem(), now = new Date();
+      var at = D.TODAY + 'T' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      var contacts = state.contacts.map(function (c) { return { nome: c.nome.trim(), cognome: c.cognome.trim(), email: c.email.trim(), testata: c.testata.trim() }; });
+      L.store(SENDS_KEY, [{ at: at, demId: d.id, status: d.scheduled ? 'scheduled' : 'sent', contacts: contacts }].concat(savedSends()));
+      state.done = { dem: d, scheduled: d.scheduled, names: state.contacts.map(fullName) };
+      state.step = 4;
+      render();
+      focusEl('done-h', true);
+    }, 1200);
+  }
+
+  function anotherContact() {
+    state.contacts = [newContact()];
+    state.viewContacts = false;
+    state.message = '';
+    state.consent = false;
+    state.consentError = false;
+    state.sendError = false;
+    state.done = null;
+    state.step = 2;
+    render();
+    focusEl('c' + state.contacts[0].id + '-email', false);
+    $('s2-h').closest('.step').scrollIntoView({ block: 'start' });
+  }
+
+  // ---------- anteprima ----------
+  // onlyRelease: solo il comunicato ("Visualizza"); altrimenti l'email completa con destinatario e messaggio
+  function openPreview(onlyRelease) {
+    var d = dem(), c = state.contacts[0], msg = state.message.trim();
+    var dlg = $('preview');
+    dlg.innerHTML =
+      '<div class="dlg-head"><h2 id="pv-h">' + (onlyRelease ? 'Comunicato' : 'Anteprima email') + '</h2><button type="button" class="icon-btn" data-action="close-preview" aria-label="Chiudi">' + L.icon('close', 22) + '</button></div>' +
+      '<div class="mail">' +
+        (onlyRelease ? '' : '<dl class="mail-meta"><dt>Da</dt><dd>Michelin tramite Lulop</dd><dt>A</dt><dd>' + esc(fullName(c)) + ' &lt;' + esc(c.email) + '&gt;</dd><dt>Oggetto</dt><dd>' + esc(d.title) + '</dd></dl>') +
+        (msg && !onlyRelease ? '<div class="mail-note"><span class="k">Messaggio di Michelin</span><p>' + esc(msg) + '</p></div>' : '') +
+        '<div class="mail-dem"><div class="band">MICHELIN · COMUNICATO STAMPA</div><div class="img">Immagine del comunicato</div>' +
+          '<div class="c"><h3>' + esc(d.title) + '</h3><p style="color:var(--text-muted);font-size:14px">' + L.dateLong(d.date) + '</p>' +
+          '<p>Qui il destinatario legge il testo del comunicato, esattamente come lo ricevono i giornalisti della lista.</p>' +
+          '<span class="fake-btn">Leggi la news</span></div>' +
+          '<div class="foot">Ricevi questa email perché Michelin te l’ha inviata tramite Lulop. Puoi disiscriverti in qualsiasi momento.</div></div>' +
+      '</div>';
+    dlg.showModal();
+  }
+
+  // ---------- eventi ----------
+  L.bindLogout();
+  $('back').innerHTML = L.icon('chevronLeft', 20) + 'Torna al report';
+
+  function goBackToReport(e) {
+    if (fromHome && history.length > 1) { e.preventDefault(); history.back(); }
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#back')) { goBackToReport(e); return; }
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var a = t.dataset.action, cid = parseInt(t.dataset.c, 10);
+    if (a === 'pick-dem') pickDem(parseInt(t.dataset.id, 10));
+    else if (a === 'change-dem') { state.step = 1; render(); focusEl('s1-h', true); }
+    else if (a === 'change-contacts') {
+      state.step = 2; state.viewContacts = false; render(); focusEl('s2-h', true);
+    }
+    else if (a === 'view-dem') openPreview(true);
+    else if (a === 'view-contacts') {
+      state.viewContacts = !state.viewContacts; render();
+      document.querySelector('[data-action="view-contacts"]').focus();
+    }
+    else if (a === 'add-contact') addContact();
+    else if (a === 'edit-contact') editContact(cid);
+    else if (a === 'remove-contact') removeContact(cid);
+    else if (a === 'toggle-all') { state.showAll = !state.showAll; render(); focusEl('s3-h', false); document.querySelector('[data-action="toggle-all"]').focus(); }
+    else if (a === 'preview') openPreview(false);
+    else if (a === 'close-preview') $('preview').close();
+    else if (a === 'send') send();
+    else if (a === 'another') anotherContact();
+    else if (a === 'back-report') goBackToReport(e);
+  });
+
+  // Click fuori dal riquadro dell'anteprima: chiude
+  $('preview').addEventListener('click', function (e) { if (e.target === this) this.close(); });
+
+  document.addEventListener('submit', function (e) {
+    if (e.target.id === 'f2') { e.preventDefault(); continueToReview(); }
+  });
+
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.id === 'demSearch') { renderSearch(t.value); return; }
+    if (t.id === 'msg') { state.message = t.value; $('msgCount').textContent = t.value.length + '/' + MSG_MAX; return; }
+    if (!t.dataset.c) return;
+    var c = state.contacts.filter(function (x) { return x.id === parseInt(t.dataset.c, 10); })[0];
+    if (!c) return;
+    c[t.dataset.f] = t.value;
+    // Mentre si scrive l'errore sparisce appena il campo è corretto, ma non ne compaiono di nuovi
+    if (c.errors[t.dataset.f] && !checkField(c, t.dataset.f)) showFieldError(c, t.dataset.f, '');
+  });
+
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'consent') {
+      state.consent = t.checked;
+      if (t.checked && state.consentError) { state.consentError = false; t.removeAttribute('aria-invalid'); $('consent-err').textContent = ''; }
+    }
+  });
+
+  // Verifica dell'email all'uscita dal campo, non a ogni carattere
+  document.addEventListener('focusout', function (e) {
+    var t = e.target;
+    if (t.dataset.f !== 'email' && t.dataset.f !== 'tel') return;
+    var c = state.contacts.filter(function (x) { return x.id === parseInt(t.dataset.c, 10); })[0];
+    if (!c || !t.value.trim()) return;
+    showFieldError(c, t.dataset.f, checkField(c, t.dataset.f));
+    if (t.dataset.f === 'email') {
+      $('c' + c.id + '-email-warn').innerHTML = warningsFor(c).map(function (w) { return '<p>' + esc(w) + '</p>'; }).join('');
+    }
+  });
+
+  function showFieldError(c, f, msg) {
+    var input = $('c' + c.id + '-' + f);
+    if (msg) { c.errors[f] = msg; input.setAttribute('aria-invalid', 'true'); }
+    else { delete c.errors[f]; input.removeAttribute('aria-invalid'); }
+    $('c' + c.id + '-' + f + '-err').textContent = msg;
+  }
+
+  // Invio sulla tastiera del telefono: passa al campo successivo invece di inviare il modulo
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (e.key !== 'Enter' || !t.dataset || !t.dataset.c || t.tagName !== 'INPUT') return;
+    e.preventDefault();
+    var fields = [].slice.call(document.querySelectorAll('#f2 input.input'));
+    var next = fields[fields.indexOf(t) + 1];
+    if (next && next.dataset.c === t.dataset.c) next.focus(); else t.blur();
+  });
+
+  function renderSearch(q) {
+    var res = $('searchResults'), status = $('searchStatus');
+    if (q.trim().length < 2) { res.innerHTML = ''; status.textContent = ''; return; }
+    var found = searchDems(q);
+    res.innerHTML = found.slice(0, 8).map(choiceHtml).join('');
+    status.textContent = found.length ? found.length + ' ' + plural(found.length, 'comunicato trovato', 'comunicati trovati') : 'Nessun comunicato trovato con queste parole.';
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 3200,
+      "title": "Report DEM — pagina cliente",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Artboard-a3zk.dc.html": {
+      "h": 600,
+      "title": "Artboard 1",
+      "w": 800,
+      "x": 1520,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-23T15:49:46.725Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {"view": "focused", "file": "Main.dc.html"},
+  "notes": {},
+  "order": [
+    "Main.dc.html",
+    "Artboard-a3zk.dc.html"
+  ],
+  "pages": [],
+  "title": "Report DEM Michelin — mockup"
+}
