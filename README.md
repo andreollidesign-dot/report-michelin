@@ -4,7 +4,7 @@ Mockup della pagina con cui Michelin, cliente di Lulop, vede come vanno le sue D
 
 HTML, CSS e JavaScript semplici, senza framework né dipendenze. I dati sono finti (`data.js`).
 
-## Versione attuale: `v7/`
+## Versione attuale: `v8/`
 
 | Pagina | Cosa mostra |
 |---|---|
@@ -17,12 +17,12 @@ File condivisi: `data.js` (dati di esempio), `common.js` (funzioni comuni), `sty
 
 ### Come aprirla
 
-Online: <https://andreollidesign-dot.github.io/report-michelin/> (porta dritto all'accesso della v7).
+Online: <https://andreollidesign-dot.github.io/report-michelin/> (porta dritto all'accesso della v8).
 
 In locale, le pagine vanno servite da un piccolo server locale (aperte con doppio clic alcune parti non funzionano):
 
 ```bash
-cd v7
+cd v8
 python3 -m http.server 8000
 ```
 
@@ -43,5 +43,6 @@ Ogni giro di modifiche è una cartella nuova; le precedenti non vengono toccate.
 | `v5/` | Aggiunti accesso e "Invia a un contatto" |
 | `v6/` | Solo mercato italiano, torta per le DEM in corso, grafico a linee |
 | `v7/` | DEM in corso escluse dai conti, testi e dati tutti in italiano |
+| `v8/` | Scarica PDF nella scheda DEM, riepilogo a tendina su telefono, filtro Pneumatici |
 
 `mock up/` contiene i PDF della v5 (mobile e desktop), numerati nell'ordine in cui leggerli.
