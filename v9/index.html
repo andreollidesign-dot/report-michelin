@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Report DEM Michelin</title>
+<script src="data.js"></script>
+<script src="common.js"></script>
+<script>LULOP.requireAuth();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="has-send-bar">
+
+  <header class="top">
+    <div class="wrap inner">
+      <div class="brand">
+        <img src="logo-lulop.png" alt="Lulop.com">
+        <span class="sep" aria-hidden="true"></span>
+        <span class="title">Report</span>
+      </div>
+      <div class="meta">
+        <span>Michelin</span>
+        <a href="login.html" data-action="logout">Esci</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="mockup-banner">Mockup &middot; tutti i numeri sono dati di esempio</div>
+
+  <main class="wrap" id="main">
+    <section class="page-head">
+      <div>
+        <h1>Statistiche DEM</h1>
+        <p class="sub" id="updated"></p>
+      </div>
+      <div class="actions" id="actions"></div>
+    </section>
+
+    <div id="errorHost" hidden></div>
+
+    <section class="sec" id="ultime" aria-labelledby="ultime-h">
+      <h2 class="sec-h" id="ultime-h">Le ultime DEM</h2>
+      <div id="carHost"></div>
+      <button type="button" class="btn block" id="seeAll" data-action="see-all"></button>
+    </section>
+
+    <section class="sec sec-divider" id="riepilogo">
+      <h2 class="sec-h riep-h-desk" id="riep-h">Riepilogo del periodo</h2>
+      <!-- su telefono tutto il riepilogo, periodo compreso, è una tendina -->
+      <h2 class="sec-h riep-h-mob"><button type="button" class="riep-head" id="riepToggle" data-action="riep-toggle" aria-expanded="false" aria-controls="riepBody"></button></h2>
+      <div id="riepBody" class="riep-body">
+        <div id="periodHost"></div>
+        <div id="riepHost" class="stack"></div>
+      </div>
+    </section>
+
+    <section class="sec sec-divider" id="tutte" tabindex="-1" aria-labelledby="tutte-h">
+      <h2 class="sec-h" id="tutte-h">Tutte le DEM del periodo</h2>
+      <div id="listHost" class="sec"></div>
+    </section>
+  </main>
+
+  <div class="wrap"><footer class="glossary" id="glossary"></footer></div>
+
+  <div class="send-bar">
+    <a class="btn primary" href="invia.html" data-send-link></a>
+  </div>
+
+  <div class="demo-widget">
+    <label for="demoSel">Stato demo</label>
+    <select id="demoSel">
+      <option value="normal">Normale</option>
+      <option value="empty">Periodo senza DEM</option>
+      <option value="loading">Caricamento</option>
+      <option value="error">Errore</option>
+    </select>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  var L = window.LULOP, D = L.data, esc = L.esc, fmt = L.fmt, pct = L.pct;
+
+  // I link della v3 (#dem-ID) portano alla nuova scheda
+  var legacy = location.hash.match(/^#dem-(\d+)$/);
+  if (legacy) { location.replace('dem.html?id=' + legacy[1]); return; }
+
+  var STATE_KEY = 'lulop-home-state', SCROLL_KEY = 'lulop-home-scroll', FROM_KEY = 'lulop-from-home', SEND_FROM_KEY = 'lulop-send-from-home';
+  var CAROUSEL_SIZE = 10;
+  var SORT_OPTIONS = [
+    ['date:-1', 'Più recenti'], ['date:1', 'Meno recenti'], ['or:-1', 'Apertura % più alta'], ['ctr:-1', 'CTR più alto'],
+    ['ap:-1', 'Più aperture'], ['cu:-1', 'Più click unici'], ['invii:-1', 'Più invii']
+  ];
+
+  function pick(v, allowed, fallback) { return allowed.indexOf(v) > -1 ? v : fallback; }
+  function clampInt(v, max, fallback) { return typeof v === 'number' && v >= 0 && v <= max ? v : fallback; }
+  var saved = L.load(STATE_KEY) || {};
+  var state = {
+    periodType: pick(saved.periodType, ['week', 'month'], 'month'),
+    weekIndex: clampInt(saved.weekIndex, D.WEEKS.length - 1, D.WEEKS.length - 1),
+    monthIndex: clampInt(saved.monthIndex, D.MONTH_LIST.length - 1, D.MONTH_LIST.length - 1),
+    metric: pick(saved.metric, ['ap', 'cu'], 'ap'),
+    filter: pick(saved.filter, ['all', 'tyres', 'guide'], 'all'),
+    sortKey: pick(saved.sortKey, ['date', 'invii', 'ap', 'or', 'cu', 'ctr'], 'date'),
+    sortDir: saved.sortDir === 1 ? 1 : -1,
+    riepOpen: saved.riepOpen === true,
+    audOpen: typeof saved.audOpen === 'boolean' ? saved.audOpen : !!(window.matchMedia && window.matchMedia('(min-width: 768px)').matches),
+    demo: 'normal'
+  };
+  function persist() {
+    L.store(STATE_KEY, { periodType: state.periodType, weekIndex: state.weekIndex, monthIndex: state.monthIndex, metric: state.metric, filter: state.filter, sortKey: state.sortKey, sortDir: state.sortDir, riepOpen: state.riepOpen, audOpen: state.audOpen });
+  }
+
+  function currentRange() {
+    return state.periodType === 'week' ? [D.WEEKS[state.weekIndex][0], D.WEEKS[state.weekIndex][1]] : D.MONTH_LIST[state.monthIndex].range;
+  }
+  function prevRange() {
+    if (state.periodType === 'week') return state.weekIndex > 0 ? [D.WEEKS[state.weekIndex - 1][0], D.WEEKS[state.weekIndex - 1][1]] : null;
+    return D.MONTH_LIST[state.monthIndex].prev;
+  }
+  function demsIn(range) { return D.DEMS.filter(function (d) { return L.inRange(d.date, range); }); }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- intestazione ----------
+  $('updated').textContent = 'Michelin · dati aggiornati il ' + D.UPDATED_LABEL;
+  $('actions').innerHTML =
+    '<a class="btn primary send-desktop" href="invia.html" data-send-link>' + L.icon('send') + 'Invia un comunicato a un contatto</a>';
+  document.querySelector('.send-bar a').innerHTML = L.icon('send') + 'Invia a un contatto';
+  $('seeAll').innerHTML = 'Vedi tutte le DEM ' + L.icon('arrowDown', 18);
+  $('glossary').innerHTML = L.glossaryHtml();
+
+  // ---------- carosello ----------
+  function carouselHtml() {
+    if (state.demo === 'loading') {
+      return '<div class="car-track" aria-hidden="true"><div class="sk sk-car"></div><div class="sk sk-car"></div><div class="sk sk-car"></div></div>';
+    }
+    var items = L.latest(CAROUSEL_SIZE);
+    var cards = items.map(function (d, i) {
+      var or = d.ap / d.invii, ctr = d.cu / d.invii;
+      var partial = L.isPartial(d), latest = i === 0;
+      var label = 'DEM ' + (i + 1) + ' di ' + items.length + (latest ? ', l’ultima inviata' : '') + ': ' + d.title + '. Inviata il ' + L.dateLong(d.date) + '. ';
+      var body;
+      if (partial) {
+        // Campagna in corso: solo la torta, i numeri definitivi arrivano a fine campagna
+        var segs = L.pieOf(d);
+        label += 'Dati in corso. ' + segs.map(function (s) { return s.label + ' ' + fmt(s.value); }).join(', ') + '. Invii ' + fmt(d.invii) + '. Liste ' + d.sentTo.join(', ') + '. ' + L.completeLabel(d) + '.';
+        body = '<div class="car-ongoing">' + L.pieSvg(segs, 96) + L.pieLegendHtml(segs, true) + '</div>' +
+          '<p class="car-ongoing-facts"><b>' + fmt(d.invii) + ' invii</b> · ore ' + d.time + '<br>Liste: ' + d.sentTo.map(esc).join(', ') + '</p>';
+      } else {
+        var topList = L.listsOf([d])[0].name, topTestata = L.testateOf([d])[0].name;
+        label += 'Apertura ' + pct(or) + ', CTR ' + pct(ctr) + '. Pubblico principale ' + topList + '. Testata più attiva ' + topTestata + '.';
+        body = '<div class="car-metrics"><div><span class="l">Apertura</span><span class="v">' + pct(or) + '</span></div><div><span class="l">CTR</span><span class="v">' + pct(ctr) + '</span></div></div>' +
+          '<dl class="car-facts"><div><dt>Pubblico principale</dt><dd>' + esc(topList) + '</dd></div><div><dt>Testata più attiva</dt><dd>' + esc(topTestata) + '</dd></div></dl>';
+      }
+      return '<a class="car-card' + (latest ? ' latest' : '') + '" href="dem.html?id=' + d.id + '" aria-label="' + esc(label) + '">' +
+        '<div class="car-meta"><span>' + L.dateLong(d.date) + '</span>' + (latest ? '<span class="latest-tag">Ultima inviata</span>' : '') + '</div>' +
+        '<h3 class="car-title">' + esc(d.title) + '</h3>' + body +
+        '<div class="car-foot">' + (partial ? '<span class="partial-badge">' + esc(L.completeLabel(d)) + '</span>' : '') + '<span class="chev">' + L.icon('chevron', 22) + '</span></div>' +
+      '</a>';
+    }).join('');
+    var dots = items.map(function (d, i) { return '<span' + (i === 0 ? ' class="on"' : '') + '></span>'; }).join('');
+    return '<div class="carousel" role="region" aria-roledescription="carosello" aria-label="Le ultime ' + items.length + ' DEM. Usa le frecce per scorrere.">' +
+        '<button type="button" class="car-arrow prev" data-action="car-prev" aria-label="Scorri indietro" disabled>' + L.icon('chevronLeft', 22) + '</button>' +
+        '<div class="car-track" id="carTrack">' + cards + '</div>' +
+        '<button type="button" class="car-arrow next" data-action="car-next" aria-label="Scorri avanti">' + L.icon('chevron', 22) + '</button>' +
+      '</div>' +
+      '<div class="car-dots" aria-hidden="true">' + dots + '</div>';
+  }
+
+  var car = null;
+  function bindCarousel() {
+    var track = $('carTrack');
+    if (!track) { car = null; return; }
+    var cards = [].slice.call(track.querySelectorAll('.car-card'));
+    var dots = [].slice.call(document.querySelectorAll('.car-dots span'));
+    var prev = document.querySelector('.car-arrow.prev'), next = document.querySelector('.car-arrow.next');
+    var behavior = L.reduceMotion ? 'auto' : 'smooth';
+    function step() { return cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : track.clientWidth; }
+    function maxScroll() { return track.scrollWidth - track.clientWidth; }
+    function activeIndex() {
+      if (track.scrollLeft >= maxScroll() - 2) return cards.length - 1;
+      return Math.max(0, Math.min(cards.length - 1, Math.round(track.scrollLeft / step())));
+    }
+    function update() {
+      var a = activeIndex();
+      dots.forEach(function (d, i) { d.className = i === a ? 'on' : ''; });
+      prev.disabled = track.scrollLeft <= 2;
+      next.disabled = track.scrollLeft >= maxScroll() - 2;
+    }
+    // Istantaneo: due scorrimenti fluidi ravvicinati vengono annullati dallo scroll-snap
+    function goTo(i) { track.scrollTo({ left: cards[i].offsetLeft - cards[0].offsetLeft, behavior: 'auto' }); }
+    var ticking = false;
+    track.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () { ticking = false; update(); });
+    }, { passive: true });
+    track.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      var i = cards.indexOf(document.activeElement);
+      if (i < 0) i = activeIndex();
+      var j = Math.max(0, Math.min(cards.length - 1, i + (e.key === 'ArrowRight' ? 1 : -1)));
+      e.preventDefault();
+      if (j === i) return;
+      cards[j].focus({ preventScroll: true });
+      goTo(j);
+    });
+    prev.addEventListener('click', function () { track.scrollBy({ left: -step(), behavior: behavior }); });
+    next.addEventListener('click', function () { track.scrollBy({ left: step(), behavior: behavior }); });
+    update();
+    car = { track: track, update: update };
+  }
+
+  // ---------- selettore del periodo ----------
+  function periodHtml() {
+    var types = [['week', 'Settimana'], ['month', 'Mese']];
+    var seg = '<div class="seg" role="group" aria-label="Tipo di periodo">' + types.map(function (t) {
+      return '<button type="button" aria-pressed="' + (state.periodType === t[0]) + '" data-action="period-type" data-value="' + t[0] + '">' + t[1] + '</button>';
+    }).join('') + '</div>';
+    var isWeek = state.periodType === 'week';
+    var idx = isWeek ? state.weekIndex : state.monthIndex;
+    var last = isWeek ? D.WEEKS.length - 1 : D.MONTH_LIST.length - 1;
+    var label = isWeek ? D.WEEKS[idx][2] + ' 2026' : D.MONTH_LIST[idx].label;
+    var unit = isWeek ? 'Settimana' : 'Mese';
+    var nav = '<div class="period-nav">' +
+      '<button type="button" class="navbtn" data-action="period-prev" aria-label="' + unit + ' precedente"' + (idx === 0 ? ' disabled' : '') + '>' + L.icon('chevronLeft') + '</button>' +
+      '<span class="period-label" aria-live="polite">' + esc(label) + '</span>' +
+      '<button type="button" class="navbtn" data-action="period-next" aria-label="' + unit + ' successivo"' + (idx === last ? ' disabled' : '') + '>' + L.icon('chevron') + '</button>' +
+    '</div>';
+    return '<div class="period-bar">' + nav + seg + '</div>';
+  }
+
+  // ---------- riepilogo ----------
+  function kpiCard(label, value, d, infoKey, isMain) {
+    var suffix = d.suffix ? ' <span class="delta-suffix">' + esc(d.suffix) + '</span>' : '';
+    return '<div class="kpi-card' + (isMain ? ' main' : '') + '">' +
+      '<span class="kpi-label">' + esc(label) + (infoKey ? L.infoBtn(infoKey) : '') + '</span>' +
+      '<span class="kpi-value">' + value + '</span>' +
+      '<span class="kpi-delta ' + d.cls + '"><span aria-hidden="true">' + d.icon + '</span> <span>' + esc(d.main) + '</span>' + suffix + '</span>' +
+    '</div>';
+  }
+
+  // Periodo ancora aperto: le percentuali si confrontano, i totali no (il periodo precedente è intero)
+  var RUNNING = { icon: '–', main: 'periodo in corso', suffix: '', cls: 'none' };
+  function kpiHtml(cur, prev, running, ongoing) {
+    var T = L.totals(cur), P = prev ? L.totals(prev) : null;
+    function dl(k, rate) { return running && !rate && P ? RUNNING : L.delta(T[k], P ? P[k] : null, rate); }
+    return '<div class="sec" aria-labelledby="kpi-h">' +
+      '<h3 class="sub-h" id="kpi-h">In sintesi</h3>' +
+      '<p class="mobile-delta-caption">vs periodo prec.</p>' +
+      '<div class="card-grid-main">' +
+        kpiCard('Apertura media', pct(T.or), dl('or', true), 'apmedia', true) +
+        kpiCard('CTR', pct(T.ctr), dl('ctr', true), 'ctr', true) +
+      '</div>' +
+      '<div class="card-grid-secondary">' +
+        kpiCard(ongoing ? 'DEM concluse' : 'DEM inviate', fmt(T.n), dl('n', false), null, false) +
+        kpiCard('Aperture uniche', fmt(T.ap), dl('ap', false), 'aperture', false) +
+        kpiCard('Click unici', fmt(T.cu), dl('cu', false), 'click', false) +
+        kpiCard(ongoing ? 'Invii delle DEM concluse' : 'Invii totali', fmt(T.inv), dl('inv', false), null, false) +
+      '</div>' +
+    '</div>';
+  }
+
+  var DAY_NAMES = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+  // Quota di aperture e click nei giorni dopo l'invio (giorno 0 = giorno di invio), dalle fasce orarie
+  var DAY_SHARE = [0.82, 0.09, 0.05, 0.01, 0.01, 0.01, 0.01];
+  function dow(day) { return new Date(day + 'T00:00:00Z').getUTCDay(); }
+  function daysBetween(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
+
+  // Settimane del mese, da lunedì a domenica, tagliate ai confini del mese
+  function weeksOfMonth(range) {
+    var out = [], start = range[0];
+    while (start <= range[1]) {
+      var end = L.addDays(start, (7 - dow(start)) % 7);
+      if (end > range[1]) end = range[1];
+      out.push([start, end]);
+      start = L.addDays(end, 1);
+    }
+    return out;
+  }
+
+  // Aperture o click registrati in un giorno, per tutte le DEM concluse (anche inviate nei giorni prima)
+  function activity(day, metric) {
+    return D.DEMS.reduce(function (a, d) {
+      if (L.isPartial(d)) return a;
+      var n = daysBetween(d.date, day);
+      return n >= 0 && n < DAY_SHARE.length ? a + d[metric] * DAY_SHARE[n] : a;
+    }, 0);
+  }
+  function sentLabel(from, to) {
+    var sent = D.DEMS.filter(function (d) { return d.date >= from && d.date <= to; });
+    if (!sent.length) return '';
+    return '<br><span class="lc-sub">' + sent.length + ' DEM' + (sent.some(L.isPartial) ? '<br>in corso' : '') + '</span>';
+  }
+  // Primo invio con dati ancora in corso: da lì in poi il grafico si ferma, per non mostrare un calo che non c'è
+  var FIRST_ONGOING = D.DEMS.filter(L.isPartial).map(function (d) { return d.date; }).sort()[0] || null;
+
+  // Mese e settimana misurano la stessa cosa: il valore di una settimana è la somma dei suoi giorni
+  function trendHtml() {
+    var isWeek = state.periodType === 'week';
+    var metric = state.metric;
+    var items, title;
+    if (isWeek) {
+      title = 'Andamento giorno per giorno';
+      var w = D.WEEKS[state.weekIndex];
+      items = [0, 1, 2, 3, 4, 5, 6].map(function (k) {
+        var day = L.addDays(w[0], k), v = day <= D.TODAY && !(FIRST_ONGOING && day >= FIRST_ONGOING) ? activity(day, metric) : null;
+        return { name: DAY_NAMES[dow(day)] + '<br>' + parseInt(day.slice(8), 10) + sentLabel(day, day), value: v, current: day === D.TODAY, label: v === null ? '' : fmt(v) };
+      });
+    } else {
+      title = 'Andamento settimana per settimana';
+      items = weeksOfMonth(D.MONTH_LIST[state.monthIndex].range).map(function (wk) {
+        var v = null;
+        if (wk[0] <= D.TODAY && !(FIRST_ONGOING && wk[1] >= FIRST_ONGOING)) {
+          v = 0;
+          for (var day = wk[0]; day <= wk[1] && day <= D.TODAY; day = L.addDays(day, 1)) v += activity(day, metric);
+        }
+        var end = L.dateShort(wk[1]).split(' ');
+        return {
+          name: parseInt(wk[0].slice(8), 10) + (wk[0] === wk[1] ? '' : '–' + end[0]) + '<br>' + end[1] + sentLabel(wk[0], wk[1]),
+          value: v, current: L.inRange(D.TODAY, wk), label: v === null ? '' : fmt(v)
+        };
+      });
+    }
+    var note = (metric === 'ap' ? 'Aperture uniche registrate' : 'Click unici registrati') + ' in ogni ' + (isWeek ? 'giorno' : 'settimana') +
+      ', anche per DEM inviate prima. Sotto, quante DEM sono partite: più invii, più aperture. Il grafico si ferma dove iniziano le DEM con dati in corso.';
+    var seg = '<div class="seg" role="group" aria-label="Metrica del grafico">' + [['ap', 'Aperture'], ['cu', 'Click unici']].map(function (m) {
+      return '<button type="button" aria-pressed="' + (metric === m[0]) + '" data-action="trend-metric" data-value="' + m[0] + '">' + m[1] + '</button>';
+    }).join('') + '</div>';
+    return '<div class="panel"><div class="panel-head"><h3 class="sub-h">' + esc(title) + '</h3>' + seg + '</div>' +
+      L.lineChart(items, { height: 170, caption: title }) + '<p class="chart-note">' + esc(note) + '</p></div>';
+  }
+
+  function clicksHtml(cur) {
+    return '<div class="panel"><div><h3 class="sub-h">Su cosa hanno cliccato</h3><p class="hint">Numero di click per tipo di link. Una persona può cliccare più link.</p></div>' +
+      L.breakdownHtml(cur) + '<p class="hint">Le disiscrizioni non sono conteggiate nei click unici né nel CTR.</p></div>';
+  }
+
+  function audienceHtml(cur) {
+    var subs = D.LISTS.map(function (l) {
+      return '<tr><td>' + esc(l.name) + '</td><td class="r">' + fmt(l.iscritti) + '</td></tr>';
+    }).join('');
+    var testate = L.testateOf(cur).slice(0, 8).map(function (t) {
+      return '<tr><td>' + esc(t.name) + ' <span class="cat">&middot; ' + esc(t.cat) + '</span></td><td class="r">' + t.ap + '</td><td class="r">' + t.cl + '</td></tr>';
+    }).join('');
+    return '<details class="aud" id="audBox"' + (state.audOpen ? ' open' : '') + '>' +
+      '<summary><h3 class="sub-h" id="pub-h">Il pubblico raggiunto</h3>' + L.icon('chevronDown', 22) + '</summary>' +
+      '<div class="sec"><p class="hint">Solo dati aggregati: mostriamo le testate, mai i nomi o le email dei giornalisti.</p>' +
+      '<div class="three-col">' +
+        '<div class="panel"><h3 class="sub-h">Iscritti alle liste di interesse</h3>' +
+          '<div class="table-scroll"><table class="mini-table"><thead><tr><th scope="col">Lista</th><th scope="col" class="r">Iscritti</th></tr></thead><tbody>' + subs + '</tbody></table></div>' +
+          '<p class="hint">Un giornalista può essere iscritto a più liste.</p></div>' +
+        '<div class="panel"><div><h3 class="sub-h">Risultati per lista di interesse</h3><p class="hint">Aperture uniche nel periodo, per interesse dichiarato dal giornalista</p></div>' + L.listBarsHtml(L.listsOf(cur)) + '</div>' +
+        '<div class="panel"><h3 class="sub-h">Testate più attive</h3>' +
+          '<div class="table-scroll"><table class="mini-table"><thead><tr><th scope="col">Testata</th><th scope="col" class="r">Aperture</th><th scope="col" class="r">Click</th></tr></thead><tbody>' + testate + '</tbody></table></div></div>' +
+      '</div>' +
+    '</div></details>';
+  }
+
+  function skeletonRiep() {
+    return '<div class="sk-stack" aria-hidden="true">' +
+      '<div class="card-grid-main"><div class="sk" style="height:130px"></div><div class="sk" style="height:130px"></div></div>' +
+      '<div class="card-grid-secondary"><div class="sk" style="height:100px"></div><div class="sk" style="height:100px"></div><div class="sk" style="height:100px"></div><div class="sk" style="height:100px"></div></div>' +
+      '<div class="two-col"><div class="sk" style="height:260px"></div><div class="sk" style="height:260px"></div></div>' +
+    '</div><p class="visually-hidden" role="status">Caricamento dei dati in corso</p>';
+  }
+
+  // ---------- lista delle DEM ----------
+  var PARTIAL_HIDES = { ap: 1, or: 1, cu: 1, ctr: 1 };
+  function tableRows(cur) {
+    var rows = cur.filter(function (d) { return state.filter === 'all' || (state.filter === 'guide') === d.guide; })
+      .map(function (d) { return Object.assign({}, d, { or: d.ap / d.invii, ctr: d.cu / d.invii, partial: L.isPartial(d) }); });
+    var done = rows.filter(function (d) { return !d.partial; });
+    var bestId = done.length > 1 ? done.reduce(function (a, b) { return b.ctr > a.ctr ? b : a; }).id : null;
+    var hides = PARTIAL_HIDES[state.sortKey];
+    rows.sort(function (a, b) {
+      // ordinando per un dato che le DEM in corso non mostrano, quelle vanno in fondo
+      if (hides && a.partial !== b.partial) return a.partial ? 1 : -1;
+      var x = a[state.sortKey], y = b[state.sortKey];
+      return (x < y ? -1 : x > y ? 1 : 0) * state.sortDir || (a.id - b.id) * state.sortDir;
+    });
+    return { rows: rows, bestId: bestId };
+  }
+
+  function listHtml(cur) {
+    var res = tableRows(cur), rows = res.rows;
+    var cols = [['date', 'Data', 'left'], ['title', 'DEM', 'left'], ['invii', 'Invii', 'right'], ['ap', 'Aperture', 'right'], ['or', 'Apertura %', 'right'], ['cu', 'Click unici', 'right'], ['ctr', 'CTR', 'right']];
+    var head = cols.map(function (c) {
+      if (c[0] === 'title') return '<th scope="col" style="text-align:left">' + c[1] + '</th>';
+      var active = state.sortKey === c[0];
+      var sort = active ? (state.sortDir > 0 ? 'ascending' : 'descending') : 'none';
+      return '<th scope="col" aria-sort="' + sort + '" style="text-align:' + c[2] + '"' + (active ? ' class="active"' : '') + '><button type="button" class="sortbtn" data-action="sort" data-key="' + c[0] + '">' + c[1] + ' <span aria-hidden="true">' + (active ? (state.sortDir > 0 ? '▲' : '▼') : '') + '</span></button></th>';
+    }).join('');
+    var body = rows.map(function (d) {
+      var best = d.id === res.bestId;
+      return '<tr class="dem-row" data-href="dem.html?id=' + d.id + '">' +
+        '<td style="white-space:nowrap;color:var(--text-muted)">' + L.dateShort(d.date) + '</td>' +
+        '<td><div class="dem-title-cell"><div>' +
+          (best ? '<span class="star-icon" data-action="info-toggle" tabindex="0" role="button" aria-label="DEM con il CTR più alto del periodo">&#9733;<span class="info-tip" role="tooltip">DEM con il CTR più alto del periodo</span></span>' : '') +
+          '<a class="title-link" href="dem.html?id=' + d.id + '">' + esc(d.title) + '</a></div>' +
+          '<span class="dem-id-row">#' + d.id + (d.partial ? ' <span class="partial-badge">' + esc(L.completeLabel(d)) + '</span>' : '') + '</span>' +
+        '</div></td>' +
+        '<td class="r">' + fmt(d.invii) + '</td>' + (d.partial ? '<td class="r na">–</td><td class="r na">–</td><td class="r na">–</td><td class="r na">–</td>' :
+        '<td class="r">' + fmt(d.ap) + '</td><td class="r">' + pct(d.or) + '</td>' +
+        '<td class="r">' + fmt(d.cu) + '</td><td class="r"><strong>' + pct(d.ctr) + '</strong></td>') +
+        '<td class="chevron-cell" aria-hidden="true">' + L.icon('chevron', 18) + '</td>' +
+      '</tr>';
+    }).join('');
+    var cards = rows.map(function (d) {
+      var best = d.id === res.bestId;
+      return '<a class="dem-card" href="dem.html?id=' + d.id + '">' +
+        '<div class="top-line"><div class="dem-card-title">' + esc(d.title) + '</div><span class="chev">' + L.icon('chevron', 20) + '</span></div>' +
+        '<div class="meta"><span>' + L.dateShort(d.date) + '</span>' + (d.partial ? '<span class="partial-badge">' + esc(L.completeLabel(d)) + '</span>' : '') +
+          (best ? '<span class="best-tag">&#9733; CTR più alto del periodo</span>' : '') + '</div>' +
+        (d.partial ? '' : '<div class="metrics"><span>Apertura<b>' + pct(d.or) + '</b></span><span>CTR<b>' + pct(d.ctr) + '</b></span></div>') +
+      '</a>';
+    }).join('');
+    var filterSeg = '<div class="seg" role="group" aria-label="Filtra le DEM">' + [['all', 'Tutte'], ['tyres', 'Pneumatici'], ['guide', 'Guida Michelin']].map(function (f) {
+      return '<button type="button" aria-pressed="' + (state.filter === f[0]) + '" data-action="dem-filter" data-value="' + f[0] + '">' + f[1] + '</button>';
+    }).join('') + '</div>';
+    var sortVal = state.sortKey + ':' + state.sortDir;
+    var known = SORT_OPTIONS.some(function (o) { return o[0] === sortVal; });
+    var sortSel = '<div class="sort-mobile"><label for="sortMobile">Ordina</label><select id="sortMobile">' +
+      (known ? '' : '<option value="' + sortVal + '" selected>Ordine scelto in tabella</option>') +
+      SORT_OPTIONS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === sortVal ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+    '</select></div>';
+    var emptyMsg = state.filter === 'guide' ? 'Nessuna DEM della Guida Michelin in questo periodo.' : state.filter === 'tyres' ? 'Nessuna DEM sui pneumatici in questo periodo.' : 'Nessuna DEM inviata in questo periodo.';
+    return '<div class="list-tools">' + filterSeg + sortSel + '<span class="list-count" role="status">' + rows.length + ' DEM</span>' +
+      '<button type="button" class="link-btn" data-action="goto-period">Cambia periodo</button></div>' +
+      (rows.length ? '' : '<p class="empty-table-msg">' + emptyMsg + '</p>') +
+      '<div class="table-wrap"' + (rows.length ? '' : ' hidden') + '><table class="dem-table">' +
+        '<colgroup><col style="width:64px"><col style="width:250px"><col style="width:68px"><col style="width:76px"><col style="width:100px"><col style="width:108px"><col style="width:66px"><col style="width:34px"></colgroup>' +
+        '<thead><tr>' + head + '<th aria-hidden="true"></th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '<div class="cards-wrap">' + cards + '</div>';
+  }
+
+  // ---------- disegno ----------
+  function renderCarousel() {
+    $('carHost').innerHTML = carouselHtml();
+    bindCarousel();
+  }
+
+  function renderPeriodAndBelow() {
+    var range = currentRange();
+    var all = demsIn(range), cur = L.completed(all), ongoing = all.length - cur.length;
+    var pr = prevRange();
+    var prev = pr ? L.completed(demsIn(pr)) : null;
+    var running = L.inRange(D.TODAY, range);
+    L.renderKeepingFocus($('periodHost'), periodHtml(), '.navbtn:not(:disabled)');
+    $('tutte-h').textContent = 'Tutte le DEM ' + periodName();
+    if (state.demo === 'loading') {
+      $('riepHost').innerHTML = skeletonRiep();
+      $('listHost').innerHTML = '<div class="sk" style="height:320px" aria-hidden="true"></div>';
+    } else if (state.demo === 'empty') {
+      $('riepHost').innerHTML = L.stateMsg({ icon: 'inbox', title: 'Nessuna DEM in questo periodo', text: 'Non risultano DEM inviate a Michelin nel periodo selezionato.', action: 'demo-goto-september', button: 'Vai a settembre' });
+    } else {
+      var riep;
+      if (ongoing && !cur.length) {
+        // Tutte le DEM del periodo sono ancora in corso: niente numeri parziali
+        var first = all.map(function (d) { return L.addDays(d.date, 7); }).sort()[0];
+        riep = L.stateMsg({ icon: 'inbox', title: 'Dati ancora in corso', text: (ongoing === 1 ? 'La DEM di questo periodo è stata inviata' : 'Le ' + ongoing + ' DEM di questo periodo sono state inviate') + ' da meno di 7 giorni. Il riepilogo arriva con i primi dati completi, dal ' + L.dayMonth(first) + '.' });
+      } else {
+        // Prima il grafico dell'andamento: è il colpo d'occhio sul periodo; poi i numeri
+        riep = trendHtml() +
+          (ongoing ? '<p class="ongoing-banner">' + (ongoing === 1 ? '1 DEM ha ancora i dati in corso e non è contata' : ongoing + ' DEM hanno ancora i dati in corso e non sono contate') + ' in questo riepilogo.</p>' : '') +
+          kpiHtml(cur, prev, running, ongoing) + clicksHtml(cur) + audienceHtml(cur);
+      }
+      L.renderKeepingFocus($('riepHost'), riep);
+      L.renderKeepingFocus($('listHost'), listHtml(all));
+    }
+    updateRiepToggle();
+    var hideList = state.demo === 'empty';
+    $('tutte').hidden = hideList;
+    $('seeAll').hidden = hideList;
+  }
+
+  // Su telefono il riepilogo, periodo compreso, è una tendina chiusa finché non la si apre (sul desktop è sempre aperto)
+  function updateRiepToggle() {
+    var open = state.riepOpen || state.demo !== 'normal';
+    $('riepilogo').classList.toggle('open', open);
+    var t = $('riepToggle');
+    t.setAttribute('aria-expanded', String(open));
+    t.innerHTML = '<span class="riep-head-text"><span>Riepilogo del periodo</span><span class="riep-period">' + esc(periodShort()) + '</span></span>' + L.icon(open ? 'chevronUp' : 'chevronDown', 24);
+  }
+  function periodShort() {
+    return state.periodType === 'week' ? 'Settimana ' + D.WEEKS[state.weekIndex][2] : D.MONTH_LIST[state.monthIndex].label;
+  }
+  function periodName() {
+    return state.periodType === 'week' ? 'della settimana ' + D.WEEKS[state.weekIndex][2] : 'di ' + D.MONTH_LIST[state.monthIndex].label.toLowerCase();
+  }
+
+  function renderAll() {
+    var error = state.demo === 'error';
+    $('errorHost').hidden = !error;
+    $('errorHost').innerHTML = error ? L.stateMsg({ icon: 'alert', title: 'Non riusciamo a recuperare i dati', text: 'C’è stato un problema nel caricare le statistiche. Riprova tra qualche istante.', action: 'demo-retry', button: 'Riprova' }) : '';
+    $('ultime').hidden = error;
+    $('riepilogo').hidden = error;
+    $('tutte').hidden = error;
+    if (error) return;
+    renderCarousel();
+    renderPeriodAndBelow();
+  }
+
+  function setDemo(v) {
+    state.demo = v;
+    $('demoSel').value = v;
+    renderAll();
+  }
+
+  // ---------- eventi ----------
+  L.bindTooltips();
+  L.bindLogout();
+
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('a[href^="dem.html"]');
+    if (link) { L.store(FROM_KEY, true); return; }
+    if (e.target.closest('[data-send-link]')) { L.store(SEND_FROM_KEY, true); return; }
+
+    var row = e.target.closest('tr[data-href]');
+    if (row && !e.target.closest('a, button, [data-action]')) {
+      L.store(FROM_KEY, true);
+      if (e.metaKey || e.ctrlKey) window.open(row.dataset.href); else location.href = row.dataset.href;
+      return;
+    }
+
+    var t = e.target.closest('[data-action]');
+    if (!t) return;
+    var a = t.dataset.action, periodChanged = true;
+    if (a === 'period-type') { state.periodType = t.dataset.value; state.riepOpen = true; }
+    else if (a === 'riep-toggle') { state.riepOpen = !state.riepOpen; persist(); updateRiepToggle(); periodChanged = false; }
+    else if (a === 'period-prev' || a === 'period-next') {
+      state.riepOpen = true;
+      var d = a === 'period-next' ? 1 : -1;
+      if (state.periodType === 'week') state.weekIndex = Math.max(0, Math.min(D.WEEKS.length - 1, state.weekIndex + d));
+      else state.monthIndex = Math.max(0, Math.min(D.MONTH_LIST.length - 1, state.monthIndex + d));
+    }
+    else if (a === 'trend-metric') { state.metric = t.dataset.value; }
+    else if (a === 'dem-filter') { state.filter = t.dataset.value; }
+    else if (a === 'sort') {
+      var key = t.dataset.key;
+      state.sortDir = state.sortKey === key ? -state.sortDir : -1;
+      state.sortKey = key;
+    }
+    else if (a === 'demo-retry') { setDemo('normal'); periodChanged = false; }
+    else if (a === 'demo-goto-september') { state.periodType = 'month'; state.monthIndex = 0; persist(); setDemo('normal'); periodChanged = false; }
+    else if (a === 'see-all') {
+      $('tutte').scrollIntoView({ behavior: L.reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      $('tutte').focus({ preventScroll: true });
+      periodChanged = false;
+    }
+    else if (a === 'goto-period') {
+      state.riepOpen = true; persist(); updateRiepToggle();
+      $('riepilogo').scrollIntoView({ behavior: L.reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      var nb = document.querySelector('#periodHost .seg button[aria-pressed="true"]');
+      if (nb) nb.focus({ preventScroll: true });
+      periodChanged = false;
+    }
+    else { periodChanged = false; }
+    if (periodChanged) { persist(); renderPeriodAndBelow(); }
+  });
+
+  $('demoSel').addEventListener('change', function (e) { setDemo(e.target.value); });
+  // "Il pubblico raggiunto" si apre e si chiude; il toggle non risale, quindi si ascolta in cattura
+  document.addEventListener('toggle', function (e) {
+    if (e.target.id === 'audBox' && e.target.open !== state.audOpen) { state.audOpen = e.target.open; persist(); }
+  }, true);
+  document.addEventListener('change', function (e) {
+    if (e.target.id !== 'sortMobile') return;
+    var p = e.target.value.split(':');
+    state.sortKey = p[0];
+    state.sortDir = parseInt(p[1], 10);
+    persist();
+    renderPeriodAndBelow();
+  });
+
+  // ---------- ritorno dalla scheda: stessa posizione ----------
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.addEventListener('pagehide', function () {
+    L.store(SCROLL_KEY, { y: window.scrollY, car: car ? car.track.scrollLeft : 0 });
+  });
+
+  renderAll();
+
+  var nav = performance.getEntriesByType ? performance.getEntriesByType('navigation')[0] : null;
+  var navType = nav ? nav.type : 'navigate';
+  var pos = (navType === 'back_forward' || navType === 'reload') ? L.load(SCROLL_KEY) : null;
+  if (pos) {
+    var touched = false;
+    ['wheel', 'touchstart', 'keydown'].forEach(function (ev) { window.addEventListener(ev, function () { touched = true; }, { once: true, passive: true }); });
+    var restore = function () {
+      if (touched) return;
+      window.scrollTo(0, pos.y);
+      if (car) { car.track.scrollLeft = pos.car; car.update(); }
+    };
+    restore();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(restore);
+  }
+  window.addEventListener('pageshow', function (e) { if (e.persisted && car) car.update(); });
+})();
+</script>
+</body>
+</html>
